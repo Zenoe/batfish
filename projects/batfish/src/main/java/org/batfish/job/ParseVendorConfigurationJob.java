@@ -69,6 +69,8 @@ import org.batfish.grammar.mrv.MrvCombinedParser;
 import org.batfish.grammar.mrv.MrvControlPlaneExtractor;
 import org.batfish.grammar.palo_alto.PaloAltoCombinedParser;
 import org.batfish.grammar.palo_alto.PaloAltoControlPlaneExtractor;
+import org.batfish.grammar.rgos.RgosCombinedParser;
+import org.batfish.grammar.rgos.RgosControlPlaneExtractor;
 import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
 import org.batfish.main.Batfish;
 import org.batfish.representation.host.HostConfiguration;
@@ -610,6 +612,23 @@ public class ParseVendorConfigurationJob extends BatfishJob<ParseVendorConfigura
           break;
         }
 
+    case RGOS:
+      {
+          Entry<String, String> fileEntry = Iterables.getOnlyElement(_fileTexts.entrySet());
+          String filename = fileEntry.getKey();
+          String fileText = fileEntry.getValue();
+          RgosCombinedParser rgosParser = new RgosCombinedParser(fileText, _settings);
+          ControlPlaneExtractor extractor =
+              new RgosControlPlaneExtractor(
+                  fileText,
+                  rgosParser,
+                  _fileResults.get(filename).getWarnings(),
+                  _fileResults.get(filename).getSilentSyntax());
+          parseFile(filename, rgosParser, extractor);
+          vc = extractor.getVendorConfiguration();
+          vc.setFilename(filename);
+          break;
+      }
       default:
         throw new BatfishException(
             String.format("File format %s is neither unsupported nor handled", format));

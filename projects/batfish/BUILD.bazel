@@ -42,6 +42,7 @@ java_library(
         "//projects/batfish/src/main/java/org/batfish/grammar/juniper",
         "//projects/batfish/src/main/java/org/batfish/grammar/palo_alto",
         "//projects/batfish/src/main/java/org/batfish/grammar/palo_alto_nested",
+        "//projects/batfish/src/main/java/org/batfish/grammar/rgos",
         "//projects/batfish/src/main/java/org/batfish/representation/aws",
         "//projects/batfish/src/main/java/org/batfish/representation/host",
         "//projects/batfish/src/main/java/org/batfish/representation/iptables",

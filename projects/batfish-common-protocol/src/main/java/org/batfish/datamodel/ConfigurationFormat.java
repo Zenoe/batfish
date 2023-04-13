@@ -41,6 +41,7 @@ public enum ConfigurationFormat {
   UNKNOWN("unknown"),
   UNSUPPORTED("unsupported"),
   VXWORKS("vxworks"),
+  RGOS("rgos"),
   VYOS("vyos");
 
   private String _vendorString;

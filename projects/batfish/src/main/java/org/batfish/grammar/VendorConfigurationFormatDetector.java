@@ -91,7 +91,7 @@ public final class VendorConfigurationFormatDetector {
       Pattern.compile("(?m)(send-to-panorama|panorama-server)");
   // open brace not likely to be opening a string literal of a JSON object
   private static final Pattern PALO_ALTO_NESTED_PATTERN = Pattern.compile("(?m)[^\"']\\{");
-
+  private static final Pattern RGOS_PATTERN = Pattern.compile("(?m)^version .*RGOS");
   private String _fileText;
 
   private char _firstChar;
@@ -355,6 +355,14 @@ public final class VendorConfigurationFormatDetector {
   }
 
   @Nullable
+  private ConfigurationFormat checkRGOS() {
+    if (fileTextMatches(RGOS_PATTERN)) {
+      return ConfigurationFormat.RGOS;
+    }
+    return null;
+  }
+
+  @Nullable
   private ConfigurationFormat checkBatfish() {
     Matcher m = BATFISH_CONFIG_FORMAT_PATTERN.matcher(_fileText);
     if (!m.find()) {
@@ -379,6 +387,8 @@ public final class VendorConfigurationFormatDetector {
     // Based on types and aliases defined in
     // https://github.com/haussli/rancid/blob/dc27e9bbb9972e475d66b4abbea981b7da6eeb23/etc/rancid.types.base
     switch (m.group(1)) {
+      case "rgos":
+        return ConfigurationFormat.RGOS;
       case "a10":
         return ConfigurationFormat.A10_ACOS;
       case "arista":
@@ -557,6 +567,7 @@ public final class VendorConfigurationFormatDetector {
         checkMss(),
         checkArubaOS(),
         checkCisco(),
+        checkRGOS(),
         ConfigurationFormat.UNKNOWN);
   }
 }
