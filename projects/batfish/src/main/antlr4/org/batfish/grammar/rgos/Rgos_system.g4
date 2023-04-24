@@ -26,3 +26,38 @@ host_name
   // See toString(ParserRuleContext messageCtx, Host_nameContext ctx) in RgosConfigurationBuilder
   string
 ;
+
+// s_version
+//     : VERSION double_quoted_string NEWLINE
+// ;
+
+
+s_version
+:
+   (
+      VERSION
+   )
+   (
+      quoted_name = double_quoted_string
+      |
+      (
+         (
+            name_parts += ~NEWLINE
+         )+
+      )
+   ) NEWLINE
+;
+
+// s_version
+// :
+// VERSION
+// (
+//       ver_name = double_quoted_string
+//       |
+//       (
+//          (
+//             ver_name_parts += ~NEWLINE
+//          )+
+//       )
+//    ) NEWLINE
+// ;

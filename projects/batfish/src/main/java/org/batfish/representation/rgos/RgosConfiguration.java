@@ -39,6 +39,10 @@ public final class RgosConfiguration extends VendorConfiguration {
     return _hostname;
   }
 
+  public void setVersion(String version) {
+    _version = version;
+  }
+
   @Override
   public void setHostname(String hostname) {
     _hostname = hostname;
@@ -59,4 +63,5 @@ public final class RgosConfiguration extends VendorConfiguration {
   // Note: For simplicity, in Cool NOS, you can only have one static route per prefix.
   private @Nonnull Map<Prefix, StaticRoute> _staticRoutes;
   private String _hostname;
+  private String _version;
 }

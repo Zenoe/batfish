@@ -542,7 +542,7 @@ public final class VendorConfigurationFormatDetector {
     // formats we know this file does not match.
     configureHeuristicBlacklist();
 
-    return firstNonNull(
+    ConfigurationFormat vendor = firstNonNull(
         checkA10(),
         checkCheckPoint(),
         checkFortios(),
@@ -569,5 +569,7 @@ public final class VendorConfigurationFormatDetector {
         checkCisco(),
         checkRGOS(),
         ConfigurationFormat.UNKNOWN);
+    System.out.println("vendor:" + vendor);
+    return vendor;
   }
 }

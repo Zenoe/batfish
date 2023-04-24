@@ -22,6 +22,7 @@ statement
   | s_log_null
   | s_static_routes
   | s_system
+  | s_version
 ;
 
 s_line

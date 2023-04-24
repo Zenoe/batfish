@@ -1,3 +1,8 @@
+/*
+ *This class may be responsible for extracting control plane information, such as routing tables,
+ *interfaces, and other network topology details, from the parsed configuration using the Batfish
+ *configuration representation built by the "RgosConfigurationBuilder.java" class.
+ */
 package org.batfish.grammar.rgos;
 
 import static com.google.common.base.Preconditions.checkArgument;

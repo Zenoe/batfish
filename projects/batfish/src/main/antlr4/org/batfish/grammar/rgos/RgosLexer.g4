@@ -9,6 +9,8 @@ tokens {
   STRING
 }
 
+VERSION: 'version' -> pushMode(M_String);
+//VERSION: 'version';
 // BEGIN keywords
 ADD: 'add';
 DELETE: 'delete';
@@ -28,7 +30,7 @@ SYSLOG: 'syslog';
 SYSTEM: 'system';
 VLAN: 'vlan';
 VTY: 'vty';
-
+SP: ' ';
 // END keywords
 
 // BEGIN other tokens
@@ -43,7 +45,11 @@ COMMENT_LINE
   {lastTokenType() == NEWLINE || lastTokenType() == -1}? -> channel(HIDDEN)
 ;
 
-DOUBLE_QUOTE: '"' -> pushMode(M_DoubleQuotedString);
+DOUBLE_QUOTE
+:
+   '"'
+;
+//DOUBLE_QUOTE: '"' -> pushMode(M_DoubleQuotedString);
 LEFT_BRACKET: '[' -> pushMode(M_StringList);
 
 IPV4_ADDRESS: F_Ipv4Address;
@@ -123,10 +129,24 @@ F_Ipv4PrefixLength
 ;
 
 fragment
-F_Newline: '\n'+;
+F_Newline
+:
+  F_NewlineChar (F_Whitespace* F_NewlineChar+)*
+;
+
+// A single newline character [sequence - allowing \r, \r\n, or \n]
+fragment
+F_NewlineChar
+:
+  '\r' '\n'?
+  | '\n'
+;
 
 fragment
-F_NonNewline: ~'\n';
+F_NonNewline
+:
+   ~[\n\r]
+;
 
 fragment
 F_Whitespace: ' '+;
