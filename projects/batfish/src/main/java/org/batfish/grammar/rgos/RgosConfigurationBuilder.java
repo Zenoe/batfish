@@ -17,36 +17,36 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.batfish.common.Warnings;
 import org.batfish.common.Warnings.ParseWarning;
 import org.batfish.datamodel.IntegerSpace;
-import org.batfish.datamodel.Ip;
-import org.batfish.datamodel.Prefix;
+// import org.batfish.datamodel.Ip;
+// import org.batfish.datamodel.Prefix;
 import org.batfish.grammar.BatfishCombinedParser;
 import org.batfish.grammar.SilentSyntaxListener;
 import org.batfish.grammar.UnrecognizedLineToken;
-import org.batfish.grammar.rgos.RgosParser.Host_nameContext;
-import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
-import org.batfish.grammar.rgos.RgosParser.Ipv4_addressContext;
-import org.batfish.grammar.rgos.RgosParser.Ipv4_prefixContext;
-import org.batfish.grammar.rgos.RgosParser.S_lineContext;
-import org.batfish.grammar.rgos.RgosParser.Ss_addContext;
-import org.batfish.grammar.rgos.RgosParser.Ss_deleteContext;
-import org.batfish.grammar.rgos.RgosParser.Ss_disableContext;
-import org.batfish.grammar.rgos.RgosParser.Ss_enableContext;
-import org.batfish.grammar.rgos.RgosParser.Ss_modifyContext;
-import org.batfish.grammar.rgos.RgosParser.Ssa_discardContext;
-import org.batfish.grammar.rgos.RgosParser.Ssa_gatewayContext;
-import org.batfish.grammar.rgos.RgosParser.Ssa_interfaceContext;
-import org.batfish.grammar.rgos.RgosParser.Ssy_host_nameContext;
+// import org.batfish.grammar.rgos.RgosParser.Host_nameContext;
+// import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
+// import org.batfish.grammar.rgos.RgosParser.Ipv4_addressContext;
+// import org.batfish.grammar.rgos.RgosParser.Ipv4_prefixContext;
+// import org.batfish.grammar.rgos.RgosParser.S_lineContext;
+// import org.batfish.grammar.rgos.RgosParser.Ss_addContext;
+// import org.batfish.grammar.rgos.RgosParser.Ss_deleteContext;
+// import org.batfish.grammar.rgos.RgosParser.Ss_disableContext;
+// import org.batfish.grammar.rgos.RgosParser.Ss_enableContext;
+// import org.batfish.grammar.rgos.RgosParser.Ss_modifyContext;
+// import org.batfish.grammar.rgos.RgosParser.Ssa_discardContext;
+// import org.batfish.grammar.rgos.RgosParser.Ssa_gatewayContext;
+// import org.batfish.grammar.rgos.RgosParser.Ssa_interfaceContext;
+// import org.batfish.grammar.rgos.RgosParser.Ssy_host_nameContext;
 // import org.batfish.grammar.rgos.RgosParser.Rgos_versionContext;
-import org.batfish.grammar.rgos.RgosParser.StringContext;
-import org.batfish.grammar.rgos.RgosParser.Uint16Context;
-import org.batfish.grammar.rgos.RgosParser.Uint8Context;
-import org.batfish.grammar.rgos.RgosParser.Vlan_numberContext;
+// import org.batfish.grammar.rgos.RgosParser.StringContext;
+// import org.batfish.grammar.rgos.RgosParser.Uint16Context;
+// import org.batfish.grammar.rgos.RgosParser.Uint8Context;
+// import org.batfish.grammar.rgos.RgosParser.Vlan_numberContext;
 import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
 import org.batfish.vendor.rgos.RgosConfiguration;
 import org.batfish.vendor.rgos.NextHop;
-import org.batfish.vendor.rgos.NextHopDiscard;
-import org.batfish.vendor.rgos.NextHopGateway;
-import org.batfish.vendor.rgos.NextHopInterface;
+// import org.batfish.vendor.rgos.NextHopDiscard;
+// import org.batfish.vendor.rgos.NextHopGateway;
+// import org.batfish.vendor.rgos.NextHopInterface;
 import org.batfish.vendor.rgos.StaticRoute;
 
 @ParametersAreNonnullByDefault
@@ -64,180 +64,6 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     _c.setExtraLines(_parser.getExtraLines());
     _w = warnings;
     _silentSyntax = silentSyntax;
-  }
-
-  @Override
-  public void exitSsy_host_name(Ssy_host_nameContext ctx) {
-    toString(ctx, ctx.hostname).ifPresent(_c::setHostname);
-  }
-
-  @Override
-  public void enterSs_add(Ss_addContext ctx) {
-    Prefix prefix = toPrefix(ctx.prefix);
-    _currentStaticRoute = new StaticRoute();
-    if (_c.getStaticRoutes().containsKey(prefix)) {
-      warn(ctx, String.format("Attempt to redefine existing static route for prefix %s", prefix));
-      return;
-    }
-    _c.getStaticRoutes().put(prefix, _currentStaticRoute);
-  }
-
-  @Override
-  public void exitSs_add(Ss_addContext ctx) {
-    if (_currentNextHop == null) {
-      // invalid next hop, so remove the route we added
-      _c.getStaticRoutes().remove(toPrefix(ctx.prefix));
-    } else {
-      _currentStaticRoute.setNextHop(_currentNextHop);
-    }
-    _currentNextHop = null;
-    _currentStaticRoute = null;
-  }
-
-  @Override
-  public void enterSs_modify(Ss_modifyContext ctx) {
-    Prefix prefix = toPrefix(ctx.prefix);
-    if (!_c.getStaticRoutes().containsKey(prefix)) {
-      warn(ctx, String.format("Attempt to modify non-existent static route for prefix %s", prefix));
-      // set to a dummy so modification further down the parse tree does not NPE
-      _currentStaticRoute = new StaticRoute();
-      return;
-    }
-    _currentStaticRoute = _c.getStaticRoutes().get(prefix);
-  }
-
-  @Override
-  public void exitSs_modify(Ss_modifyContext ctx) {
-    if (_currentNextHop != null) {
-      _currentStaticRoute.setNextHop(_currentNextHop);
-    }
-    _currentNextHop = null;
-    _currentStaticRoute = null;
-  }
-
-  @Override
-  public void exitSsa_discard(Ssa_discardContext ctx) {
-    _currentNextHop = NextHopDiscard.instance();
-  }
-
-  @Override
-  public void exitSsa_gateway(Ssa_gatewayContext ctx) {
-    _currentNextHop = new NextHopGateway(toIp(ctx.ip));
-  }
-
-  @Override
-  public void exitSsa_interface(Ssa_interfaceContext ctx) {
-    toString(ctx, ctx.interface_name())
-        .ifPresent(name -> _currentNextHop = new NextHopInterface(name));
-  }
-
-  @Override
-  public void exitSs_delete(Ss_deleteContext ctx) {
-    Prefix prefix = toPrefix(ctx.prefix);
-    if (!_c.getStaticRoutes().containsKey(prefix)) {
-      warn(
-          ctx, String.format("Attempt to delete non-existent static route with prefix %s", prefix));
-      return;
-    }
-    _c.getStaticRoutes().remove(prefix);
-  }
-
-  @Override
-  public void exitSs_enable(Ss_enableContext ctx) {
-    _currentStaticRoute.setEnable(true);
-  }
-
-  @Override
-  public void exitSs_disable(Ss_disableContext ctx) {
-    _currentStaticRoute.setEnable(false);
-  }
-
-  @Override
-  public void exitS_line(S_lineContext ctx) {
-    todo(ctx);
-  }
-
-  private @Nonnull Optional<String> toString(
-      ParserRuleContext messageCtx, Interface_nameContext ctx) {
-    if (ctx.ETHERNET() != null) {
-      return Optional.of(String.format("ethernet %d", toInteger(ctx.ethernet_num)));
-    } else {
-      assert ctx.VLAN() != null;
-      Optional<Integer> maybeVlan = toInteger(messageCtx, ctx.vlan);
-      if (!maybeVlan.isPresent()) {
-        // already warned
-        return Optional.empty();
-      }
-      return Optional.of(String.format("vlan %d", maybeVlan.get()));
-    }
-  }
-
-  private static int toInteger(Uint8Context ctx) {
-    return Integer.parseInt(ctx.getText());
-  }
-
-  private @Nonnull Optional<Integer> toInteger(
-      ParserRuleContext messageCtx, Vlan_numberContext ctx) {
-    return toIntegerInSpace(messageCtx, ctx.uint16(), VLAN_NUMBER_RANGE, "vlan number");
-  }
-
-  private static @Nonnull Ip toIp(Ipv4_addressContext ctx) {
-    return Ip.parse(ctx.getText());
-  }
-
-  private static @Nonnull Prefix toPrefix(Ipv4_prefixContext ctx) {
-    return Prefix.parse(ctx.getText());
-  }
-
-  private @Nonnull Optional<String> toString(ParserRuleContext messageCtx, Host_nameContext ctx) {
-    if (!toStringWithLengthInSpace(messageCtx, ctx.string(), HOSTNAME_LENGTH_RANGE, "hostname")
-        .isPresent()) {
-      // already warned
-      return Optional.empty();
-    }
-    return toStringMatchingPattern(messageCtx, ctx.string(), HOSTNAME_PATTERN, "hostname");
-  }
-
-  /**
-   * Return the text of the provided {@code ctx} if its length is within the provided {@link
-   * IntegerSpace lengthSpace}, or else {@link Optional#empty}.
-   */
-  private @Nonnull Optional<String> toStringWithLengthInSpace(
-      ParserRuleContext messageCtx, StringContext ctx, IntegerSpace lengthSpace, String name) {
-    String text = unquote(ctx.getText());
-    if (!lengthSpace.contains(text.length())) {
-      warn(
-          messageCtx,
-          String.format(
-              "Expected %s with length in range %s, but got '%s'", name, lengthSpace, text));
-      return Optional.empty();
-    }
-    return Optional.of(text);
-  }
-
-  /**
-   * Return the text of the provided {@code ctx} if it is matched by the provided {@link Pattern
-   * lengthSpace}, or else {@link Optional#empty}.
-   */
-  private @Nonnull Optional<String> toStringMatchingPattern(
-      ParserRuleContext messageCtx, StringContext ctx, Pattern pattern, String name) {
-    String text = unquote(ctx.getText());
-    if (!pattern.matcher(text).matches()) {
-      warn(
-          messageCtx,
-          String.format("Invalid %s '%s' does not match regex: %s", name, text, pattern));
-      return Optional.empty();
-    }
-    return Optional.of(text);
-  }
-
-  /**
-   * Convert a {@link Uint16Context} to an {@link Integer} if it is contained in the provided {@code
-   * space}, or else {@link Optional#empty}.
-   */
-  private @Nonnull Optional<Integer> toIntegerInSpace(
-      ParserRuleContext messageCtx, Uint16Context ctx, IntegerSpace space, String name) {
-    return toIntegerInSpace_helper(messageCtx, ctx, space, name);
   }
 
   /**

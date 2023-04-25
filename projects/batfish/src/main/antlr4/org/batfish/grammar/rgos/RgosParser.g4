@@ -1,9 +1,9 @@
 parser grammar RgosParser;
 
 import
-Rgos_common,
-Rgos_static_routes,
-Rgos_system;
+Rgos_system,
+Rgos_bgp,
+Rgos_common;
 
 options {
    superClass = 'org.batfish.grammar.rgos.parsing.RgosBaseParser';
@@ -16,21 +16,8 @@ rgos_configuration
   statement+ EOF
 ;
 
+
 statement
 :
-  s_line
-  | s_log_null
-  | s_static_routes
-  | s_system
-  | s_version
-;
-
-s_line
-:
-  LINE VTY NEWLINE
-;
-
-s_log_null
-:
-  LOG SYSLOG NEWLINE
+  s_version
 ;
