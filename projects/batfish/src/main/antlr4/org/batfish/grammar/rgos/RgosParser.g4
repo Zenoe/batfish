@@ -3,6 +3,7 @@ parser grammar RgosParser;
 import
 Rgos_system,
 Rgos_bgp,
+Rgos_interface,
 Rgos_common;
 
 options {
@@ -12,12 +13,21 @@ options {
 
 rgos_configuration
 :
-  NEWLINE?
-  statement+ EOF
+   NEWLINE?
+   (sl += stanza)+
+   COLON? NEWLINE?
+   EOF
 ;
 
-
-statement
+s_interface_line
 :
-  s_version
+   NO? INTERFACE BREAKOUT null_rest_of_line
+;
+
+stanza
+:
+   s_hostname
+   | s_interface_line
+   | s_interface
+   | s_version
 ;

@@ -1,4 +1,4 @@
-package org.batfish.vendor.rgos;
+package org.batfish.representation.rgos;
 
 import javax.annotation.Nonnull;
 import org.batfish.datamodel.Configuration;
@@ -15,6 +15,19 @@ public final class RgosConversions {
         .forEach(
             (prefix, route) ->
                 c.getDefaultVrf().getStaticRoutes().add(toStaticRoute(prefix, route)));
+  }
+
+
+  static String toJavaRegex(String ciscoRegex) {
+    String withoutQuotes;
+    if (ciscoRegex.charAt(0) == '"' && ciscoRegex.charAt(ciscoRegex.length() - 1) == '"') {
+      withoutQuotes = ciscoRegex.substring(1, ciscoRegex.length() - 1);
+    } else {
+      withoutQuotes = ciscoRegex;
+    }
+    String underscoreReplacement = "(,|\\\\{|\\\\}|^|\\$| )";
+    String output = withoutQuotes.replaceAll("_", underscoreReplacement);
+    return output;
   }
 
   private static @Nonnull org.batfish.datamodel.StaticRoute toStaticRoute(

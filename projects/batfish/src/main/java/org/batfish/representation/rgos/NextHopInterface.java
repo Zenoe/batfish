@@ -1,4 +1,4 @@
-package org.batfish.vendor.rgos;
+package org.batfish.representation.rgos;
 
 import javax.annotation.Nonnull;
 

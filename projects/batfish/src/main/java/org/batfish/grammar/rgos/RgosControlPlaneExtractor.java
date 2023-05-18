@@ -18,7 +18,7 @@ import org.batfish.grammar.ImplementedRules;
 import org.batfish.grammar.rgos.RgosParser.Rgos_configurationContext;
 import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
 import org.batfish.vendor.VendorConfiguration;
-import org.batfish.vendor.rgos.RgosConfiguration;
+import org.batfish.representation.rgos.RgosConfiguration;
 
 /** Extracts data from RGOS parse tree into a {@link RgosConfiguration}. */
 public final class RgosControlPlaneExtractor implements ControlPlaneExtractor {

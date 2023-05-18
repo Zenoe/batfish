@@ -42,12 +42,12 @@ import org.batfish.grammar.UnrecognizedLineToken;
 // import org.batfish.grammar.rgos.RgosParser.Uint8Context;
 // import org.batfish.grammar.rgos.RgosParser.Vlan_numberContext;
 import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
-import org.batfish.vendor.rgos.RgosConfiguration;
-import org.batfish.vendor.rgos.NextHop;
+import org.batfish.representation.rgos.RgosConfiguration;
+import org.batfish.representation.rgos.NextHop;
 // import org.batfish.vendor.rgos.NextHopDiscard;
 // import org.batfish.vendor.rgos.NextHopGateway;
 // import org.batfish.vendor.rgos.NextHopInterface;
-import org.batfish.vendor.rgos.StaticRoute;
+import org.batfish.representation.rgos.StaticRoute;
 
 @ParametersAreNonnullByDefault
 public final class RgosConfigurationBuilder extends RgosParserBaseListener

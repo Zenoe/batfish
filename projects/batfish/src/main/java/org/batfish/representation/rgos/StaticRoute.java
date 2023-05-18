@@ -1,5 +1,4 @@
-package org.batfish.vendor.rgos;
-
+package org.batfish.representation.rgos;
 import java.io.Serializable;
 import javax.annotation.Nonnull;
 

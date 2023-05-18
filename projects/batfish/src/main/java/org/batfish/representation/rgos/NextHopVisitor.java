@@ -1,5 +1,4 @@
-package org.batfish.vendor.rgos;
-
+package org.batfish.representation.rgos;
 /** Visitor of {@link NextHop} that returns a generic value of type {@code T}. */
 public interface NextHopVisitor<T> {
 
