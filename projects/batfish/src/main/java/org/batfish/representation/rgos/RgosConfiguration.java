@@ -16,11 +16,24 @@ import org.batfish.vendor.VendorConfiguration;
 
 /** Vendor-specific data model for example Cool NOS configuration. */
 public final class RgosConfiguration extends VendorConfiguration {
+  public static String getCanonicalInterfaceNamePrefix(String prefix) {
+    return prefix;
+    // for (Entry<String, String> e : CISCO_INTERFACE_PREFIXES.entrySet()) {
+    //   String matchPrefix = e.getKey();
+    //   String canonicalPrefix = e.getValue();
+    //   if (matchPrefix.toLowerCase().startsWith(prefix.toLowerCase())) {
+    //     return canonicalPrefix;
+    //   }
+    // }
+    // throw new BatfishException("Invalid interface name prefix: '" + prefix + "'");
+  }
 
   public RgosConfiguration() {
     _asPathAccessLists = new TreeMap<>();
     _prefixLists = new TreeMap<>();
     _staticRoutes = new HashMap<>();
+    _interfaces = new TreeMap<>();
+
   }
 
   private @Nonnull Configuration toVendorIndependentConfiguration() {
@@ -32,8 +45,18 @@ public final class RgosConfiguration extends VendorConfiguration {
             .build();
 
     convertStaticRoutes(this, c);
+    StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
 
+    // for (StackTraceElement element : stackTraceElements) {
+    //   System.out.println(element.getClassName() + "." + element.getMethodName()
+    //                      + "(" + element.getFileName() + ":" + element.getLineNumber() + ")");
+    // }
+    System.out.println("toVendorIndependentConfiguration"+_hostname);
     return c;
+  }
+
+  public Map<String, Interface> getInterfaces() {
+    return _interfaces;
   }
 
   @Override
@@ -69,6 +92,9 @@ public final class RgosConfiguration extends VendorConfiguration {
   public Map<String, PrefixList> getPrefixLists() {
     return _prefixLists;
   }
+
+  private final Map<String, Interface> _interfaces;
+
   // Note: For simplicity, in Cool NOS, you can only have one static route per prefix.
   private @Nonnull Map<Prefix, StaticRoute> _staticRoutes;
   private String _hostname;

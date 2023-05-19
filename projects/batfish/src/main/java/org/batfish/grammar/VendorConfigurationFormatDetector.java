@@ -543,6 +543,7 @@ public final class VendorConfigurationFormatDetector {
     configureHeuristicBlacklist();
 
     ConfigurationFormat vendor = firstNonNull(
+        checkRGOS(),
         checkA10(),
         checkCheckPoint(),
         checkFortios(),
@@ -567,7 +568,6 @@ public final class VendorConfigurationFormatDetector {
         checkMss(),
         checkArubaOS(),
         checkCisco(),
-        checkRGOS(),
         ConfigurationFormat.UNKNOWN);
     System.out.println("vendor:" + vendor);
     return vendor;

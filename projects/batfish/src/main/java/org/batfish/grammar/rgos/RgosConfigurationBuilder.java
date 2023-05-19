@@ -5,6 +5,8 @@
 package org.batfish.grammar.rgos;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import com.google.common.collect.ImmutableSortedSet;
+
 
 import com.google.common.collect.Range;
 import java.util.Optional;
@@ -17,11 +19,27 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.batfish.common.Warnings;
 import org.batfish.common.Warnings.ParseWarning;
 import org.batfish.datamodel.IntegerSpace;
+import org.batfish.datamodel.SubRange;
+import static org.batfish.representation.rgos.RgosStructureType.INTERFACE;
+import static org.batfish.representation.rgos.RgosStructureUsage.INTERFACE_SELF_REF;
+
 // import org.batfish.datamodel.Ip;
 // import org.batfish.datamodel.Prefix;
 import org.batfish.grammar.BatfishCombinedParser;
 import org.batfish.grammar.SilentSyntaxListener;
 import org.batfish.grammar.UnrecognizedLineToken;
+
+import org.batfish.common.BatfishException;
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.batfish.grammar.rgos.RgosParser.S_interface_definitionContext;
+import org.batfish.grammar.rgos.RgosParser.S_interface_definitionContext;
+import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
+
+import org.batfish.representation.rgos.Interface;
+
 // import org.batfish.grammar.rgos.RgosParser.Host_nameContext;
 // import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
 // import org.batfish.grammar.rgos.RgosParser.Ipv4_addressContext;
@@ -60,8 +78,8 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
       SilentSyntaxCollection silentSyntax) {
     _parser = parser;
     _text = text;
-    _c = new RgosConfiguration();
-    _c.setExtraLines(_parser.getExtraLines());
+    _configuration = new RgosConfiguration();
+    _configuration.setExtraLines(_parser.getExtraLines());
     _w = warnings;
     _silentSyntax = silentSyntax;
   }
@@ -101,7 +119,7 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     Token token = errorNode.getSymbol();
     int line = token.getLine();
     String lineText = errorNode.getText().replace("\n", "").replace("\r", "").trim();
-    _c.setUnrecognized(true);
+    _configuration.setUnrecognized(true);
 
     if (token instanceof UnrecognizedLineToken) {
       UnrecognizedLineToken unrecToken = (UnrecognizedLineToken) token;
@@ -113,6 +131,46 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
       String msg = String.format("Unrecognized Line: %d: %s", line, lineText);
       _w.redFlag(msg + " SUBSEQUENT LINES MAY NOT BE PROCESSED CORRECTLY");
     }
+  }
+
+  @Override
+  public void enterS_interface_definition(S_interface_definitionContext ctx) {
+    String nameAlpha = ctx.iname.name_prefix_alpha.getText();
+    String canonicalNamePrefix;
+    try {
+      canonicalNamePrefix = RgosConfiguration.getCanonicalInterfaceNamePrefix(nameAlpha);
+    } catch (BatfishException e) {
+      warn(ctx, "Error fetching interface name: " + e.getMessage());
+      _currentInterfaces = ImmutableList.of();
+      return;
+    }
+    StringBuilder namePrefix = new StringBuilder(canonicalNamePrefix);
+    for (Token part : ctx.iname.name_middle_parts) {
+      namePrefix.append(part.getText());
+    }
+    _currentInterfaces = new ArrayList<>();
+    if (ctx.iname.range() != null) {
+      List<SubRange> ranges = toRange(ctx.iname.range());
+      for (SubRange range : ranges) {
+        for (int i = range.getStart(); i <= range.getEnd(); i++) {
+          String name = namePrefix.toString() + i;
+          addInterface(name, ctx.iname, true);
+          _configuration.defineStructure(INTERFACE, name, ctx);
+          _configuration.referenceStructure(
+              INTERFACE, name, INTERFACE_SELF_REF, ctx.getStart().getLine());
+        }
+      }
+    } else {
+      addInterface(namePrefix.toString(), ctx.iname, true);
+    }
+    if (ctx.MULTIPOINT() != null) {
+      todo(ctx);
+    }
+  }
+
+  @Override
+  public void exitS_interface_definition(S_interface_definitionContext ctx) {
+    _currentInterfaces = null;
   }
 
   @Override
@@ -141,17 +199,52 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
   }
 
   public @Nonnull RgosConfiguration getConfiguration() {
-    return _c;
+    return _configuration;
+  }
+
+  private Interface addInterface(String name, Interface_nameContext ctx, boolean explicit) {
+    Interface newInterface = _configuration.getInterfaces().get(name);
+    if (newInterface == null) {
+      newInterface = new Interface(name, _configuration);
+      _configuration.getInterfaces().put(name, newInterface);
+      initInterface(newInterface, ctx);
+    } else {
+      _w.pedantic("Interface: '" + name + "' altered more than once");
+    }
+    newInterface.setDeclaredNames(
+        new ImmutableSortedSet.Builder<String>(naturalOrder())
+            .addAll(newInterface.getDeclaredNames())
+            .add(ctx.getText())
+            .build());
+    if (explicit) {
+      _currentInterfaces.add(newInterface);
+    }
+    return newInterface;
+  }
+
+
+  private void initInterface(Interface iface, Interface_nameContext ctx) {
+    String nameAlpha = ctx.name_prefix_alpha.getText();
+    String canonicalNamePrefix = RgosConfiguration.getCanonicalInterfaceNamePrefix(nameAlpha);
+    String vrf =
+        canonicalNamePrefix.equals(RgosConfiguration.MANAGEMENT_INTERFACE_PREFIX)
+            ? RgosConfiguration.MANAGEMENT_VRF_NAME
+            : Configuration.DEFAULT_VRF_NAME;
+    int mtu = Interface.getDefaultMtu();
+    iface.setVrf(vrf);
+    initVrf(vrf);
+    iface.setMtu(mtu);
   }
 
   private final @Nonnull RgosCombinedParser _parser;
   private final @Nonnull String _text;
-  private final @Nonnull RgosConfiguration _c;
+  private final @Nonnull RgosConfiguration _configuration;
   private final @Nonnull Warnings _w;
   private final @Nonnull SilentSyntaxCollection _silentSyntax;
 
   private StaticRoute _currentStaticRoute;
   private NextHop _currentNextHop;
+  private List<Interface> _currentInterfaces;
 
   private static final IntegerSpace HOSTNAME_LENGTH_RANGE = IntegerSpace.of(Range.closed(1, 32));
   private static final IntegerSpace VLAN_NUMBER_RANGE = IntegerSpace.of(Range.closed(1, 4094));

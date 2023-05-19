@@ -23,6 +23,7 @@ public abstract class RgosBaseLexer extends BatfishLexer {
     if (token.getChannel() != HIDDEN) {
       _secondToLastTokenType = _lastTokenType;
       _lastTokenType = token.getType();
+      // System.out.println("token:" + token.getText());
     }
   }
 

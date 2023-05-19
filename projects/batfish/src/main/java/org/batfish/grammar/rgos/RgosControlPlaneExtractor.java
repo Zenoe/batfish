@@ -5,6 +5,7 @@
  */
 package org.batfish.grammar.rgos;
 
+import com.google.common.collect.ImmutableSortedSet;
 import static com.google.common.base.Preconditions.checkArgument;
 
 import java.util.Set;
@@ -20,6 +21,10 @@ import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
 import org.batfish.vendor.VendorConfiguration;
 import org.batfish.representation.rgos.RgosConfiguration;
 
+
+import org.batfish.representation.rgos.Interface;
+
+import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
 /** Extracts data from RGOS parse tree into a {@link RgosConfiguration}. */
 public final class RgosControlPlaneExtractor implements ControlPlaneExtractor {
 
