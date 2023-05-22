@@ -7,6 +7,7 @@ package org.batfish.grammar.rgos;
 import static com.google.common.base.Preconditions.checkArgument;
 import com.google.common.collect.ImmutableSortedSet;
 
+import static java.util.Comparator.naturalOrder;
 
 import com.google.common.collect.Range;
 import java.util.Optional;
@@ -39,6 +40,11 @@ import org.batfish.grammar.rgos.RgosParser.S_interface_definitionContext;
 import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
 
 import org.batfish.representation.rgos.Interface;
+import org.batfish.representation.rgos.Vrf;
+import org.batfish.grammar.rgos.RgosParser.RangeContext;
+import org.batfish.grammar.rgos.RgosParser.RangeContext;
+import org.batfish.grammar.rgos.RgosParser.SubrangeContext;
+
 
 // import org.batfish.grammar.rgos.RgosParser.Host_nameContext;
 // import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
@@ -57,8 +63,9 @@ import org.batfish.representation.rgos.Interface;
 // import org.batfish.grammar.rgos.RgosParser.Rgos_versionContext;
 // import org.batfish.grammar.rgos.RgosParser.StringContext;
 // import org.batfish.grammar.rgos.RgosParser.Uint16Context;
-// import org.batfish.grammar.rgos.RgosParser.Uint8Context;
-// import org.batfish.grammar.rgos.RgosParser.Vlan_numberContext;
+import org.batfish.grammar.rgos.RgosParser.Uint8Context;
+import org.batfish.grammar.rgos.RgosParser.DecContext;
+import org.batfish.grammar.rgos.RgosParser.Vlan_idContext;
 import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
 import org.batfish.representation.rgos.RgosConfiguration;
 import org.batfish.representation.rgos.NextHop;
@@ -229,12 +236,51 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     String vrf =
         canonicalNamePrefix.equals(RgosConfiguration.MANAGEMENT_INTERFACE_PREFIX)
             ? RgosConfiguration.MANAGEMENT_VRF_NAME
-            : Configuration.DEFAULT_VRF_NAME;
+            : RgosConfiguration.DEFAULT_VRF_NAME;
     int mtu = Interface.getDefaultMtu();
     iface.setVrf(vrf);
     initVrf(vrf);
     iface.setMtu(mtu);
   }
+
+  private Vrf initVrf(String vrfName) {
+    return _configuration.getVrfs().computeIfAbsent(vrfName, Vrf::new);
+  }
+
+  private static SubRange toSubRange(SubrangeContext ctx) {
+    int low = toInteger(ctx.low);
+    if (ctx.DASH() != null) {
+      int high = toInteger(ctx.high);
+      return new SubRange(low, high);
+    } else {
+      return SubRange.singleton(low);
+    }
+  }
+
+  private static List<SubRange> toRange(RangeContext ctx) {
+    List<SubRange> range = new ArrayList<>();
+    for (SubrangeContext sc : ctx.range_list) {
+      SubRange sr = toSubRange(sc);
+      range.add(sr);
+    }
+    return range;
+  }
+  private static int toInteger(Uint8Context ctx) {
+    return Integer.parseInt(ctx.getText());
+  }
+
+  private static int toInteger(DecContext ctx) {
+    return Integer.parseInt(ctx.getText());
+  }
+
+  private static int toInteger(Token t) {
+    return Integer.parseInt(t.getText());
+  }
+
+  private static int toInteger(Vlan_idContext ctx) {
+    return Integer.parseInt(ctx.getText(), 10);
+  }
+
 
   private final @Nonnull RgosCombinedParser _parser;
   private final @Nonnull String _text;

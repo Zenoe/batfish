@@ -27,12 +27,15 @@ public final class RgosConfiguration extends VendorConfiguration {
     // }
     // throw new BatfishException("Invalid interface name prefix: '" + prefix + "'");
   }
+  private final Map<String, Vrf> _vrfs;
 
   public RgosConfiguration() {
     _asPathAccessLists = new TreeMap<>();
     _prefixLists = new TreeMap<>();
     _staticRoutes = new HashMap<>();
     _interfaces = new TreeMap<>();
+    _vrfs = new TreeMap<>();
+    _vrfs.put(Configuration.DEFAULT_VRF_NAME, new Vrf(Configuration.DEFAULT_VRF_NAME));
 
   }
 
@@ -92,6 +95,20 @@ public final class RgosConfiguration extends VendorConfiguration {
   public Map<String, PrefixList> getPrefixLists() {
     return _prefixLists;
   }
+
+  public Map<String, Vrf> getVrfs() {
+    return _vrfs;
+  }
+  public Vrf getDefaultVrf() {
+    return _vrfs.get(Configuration.DEFAULT_VRF_NAME);
+  }
+
+
+  public static final String DEFAULT_VRF_NAME = "default";
+
+  public static final String MANAGEMENT_VRF_NAME = "management";
+
+  public static final String MANAGEMENT_INTERFACE_PREFIX = "mgmt";
 
   private final Map<String, Interface> _interfaces;
 
