@@ -729,6 +729,68 @@ public final class Interface extends ComparableStructure<String> {
   }
 
   @VisibleForTesting
+  static InterfaceType computeRgosInterfaceType(String name) {
+    if (name.startsWith("Async")) {
+      return InterfaceType.PHYSICAL;
+    } else if (name.startsWith("Ethernet")
+        || name.startsWith("FastEthernet")
+        || name.startsWith("FortyGigabitEthernet")
+        || name.startsWith("GigabitEthernet")
+        || name.startsWith("HundredGigabitEthernet")
+        || name.startsWith("HundredGigE")
+        || name.startsWith("FiftyGigE")
+        || name.startsWith("FortyGigE")
+        || name.startsWith("FourHundredGigE")
+        || name.startsWith("TenGigabitEthernet")
+        || name.startsWith("TenGigE")
+        || name.startsWith("TwentyFiveGigE")
+        || name.startsWith("TwoHundredGigE")) {
+      if (name.contains(".")) {
+        // Subinterface
+        return InterfaceType.LOGICAL;
+      } else {
+        return InterfaceType.PHYSICAL;
+      }
+    } else if (name.startsWith("Group-Async")) {
+      return InterfaceType.PHYSICAL;
+    } else if (name.startsWith("Loopback")) {
+      return InterfaceType.LOOPBACK;
+    } else if (name.startsWith("Management")) {
+      return InterfaceType.PHYSICAL;
+    } else if (name.startsWith("mgmt")) {
+      return InterfaceType.PHYSICAL;
+    } else if (name.startsWith("Null")) {
+      return InterfaceType.NULL;
+    } else if (name.toLowerCase().startsWith("port-channel")) {
+      if (name.contains(".")) {
+        // Subinterface of a port channel
+        return InterfaceType.AGGREGATE_CHILD;
+      } else {
+        return InterfaceType.AGGREGATED;
+      }
+    } else if (name.startsWith("POS")) {
+      return InterfaceType.PHYSICAL;
+    } else if (name.startsWith("Redundant") && name.contains(".")) {
+      return InterfaceType.REDUNDANT_CHILD;
+    } else if (name.startsWith("Redundant")) {
+      return InterfaceType.REDUNDANT;
+    } else if (name.startsWith("Serial")) {
+      return InterfaceType.PHYSICAL;
+    } else if (name.startsWith("Tunnel")) {
+      return InterfaceType.TUNNEL;
+    } else if (name.startsWith("tunnel-ip")) {
+      return InterfaceType.TUNNEL;
+    } else if (name.startsWith("tunnel-te")) {
+      return InterfaceType.TUNNEL;
+    } else if (name.startsWith("Vlan")) {
+      return InterfaceType.VLAN;
+    } else if (name.startsWith("Vxlan")) {
+      return InterfaceType.TUNNEL;
+    } else {
+      return InterfaceType.UNKNOWN;
+    }
+  }
+  @VisibleForTesting
   static InterfaceType computeCiscoInterfaceType(String name) {
     if (name.startsWith("Async")) {
       return InterfaceType.PHYSICAL;
@@ -834,6 +896,8 @@ public final class Interface extends ComparableStructure<String> {
       case AWS:
         return computeAwsInterfaceType(name);
 
+      case RGOS:
+        return computeRgosInterfaceType(name);
       case ARISTA:
       case ARUBAOS:
       case CADANT:

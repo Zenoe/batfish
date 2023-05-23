@@ -1,6 +1,8 @@
 package org.batfish.representation.rgos;
 import static org.batfish.representation.rgos.RgosConversions.convertStaticRoutes;
+import static org.batfish.datamodel.Interface.computeInterfaceType;
 
+// import org.batfish.common.BatfishException;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,19 +43,32 @@ public final class RgosConfiguration extends VendorConfiguration {
 
   private @Nonnull Configuration toVendorIndependentConfiguration() {
     Configuration c =
-        Configuration.builder()
-            .setHostname(_hostname)
-            .setDefaultCrossZoneAction(LineAction.PERMIT)
-            .setDefaultInboundAction(LineAction.PERMIT)
-            .build();
+      Configuration.builder()
+      .setHostname(_hostname)
+      .setConfigurationFormat(_vendor)
+      .setDefaultCrossZoneAction(LineAction.PERMIT)
+      .setDefaultInboundAction(LineAction.PERMIT)
+      .build();
 
     convertStaticRoutes(this, c);
-    StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
+    // StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
 
     // for (StackTraceElement element : stackTraceElements) {
     //   System.out.println(element.getClassName() + "." + element.getMethodName()
     //                      + "(" + element.getFileName() + ":" + element.getLineNumber() + ")");
     // }
+
+    _interfaces.forEach(
+        (ifaceName, iface) -> {
+          // Handle renaming interfaces for ASA devices
+          String newIfaceName = iface.getName();
+          org.batfish.datamodel.Interface newInterface = toInterface(newIfaceName, iface, c);
+          // String vrfName = iface.getVrf();
+          // if (vrfName == null) {
+          //   throw new BatfishException("Missing vrf name for iface: '" + iface.getName() + "'");
+          // }
+          // c.getAllInterfaces().put(newIfaceName, newInterface);
+        });
     System.out.println("toVendorIndependentConfiguration"+_hostname);
     return c;
   }
@@ -80,8 +95,246 @@ public final class RgosConfiguration extends VendorConfiguration {
     return _staticRoutes;
   }
 
+  private org.batfish.datamodel.Interface toInterface(
+      String ifaceName, Interface iface, Configuration c) {
+    org.batfish.datamodel.Interface newIface =
+        org.batfish.datamodel.Interface.builder()
+            .setName(ifaceName)
+            .setOwner(c)
+            .setType(computeInterfaceType(iface.getName(), c.getConfigurationFormat()))
+            .build();
+    // String vrfName = iface.getVrf();
+    // Vrf vrf = _vrfs.computeIfAbsent(vrfName, Vrf::new);
+    // newIface.setDescription(iface.getDescription());
+    // if (!iface.getActive()) {
+    //   newIface.adminDown();
+    // }
+    // String channelGroup = iface.getChannelGroup();
+    // newIface.setChannelGroup(channelGroup);
+    // if (iface.getActive() && channelGroup != null && !_interfaces.containsKey(channelGroup)) {
+    //   _w.redFlag(
+    //       String.format(
+    //           "Deactivating interface %s that refers to undefined channel-group %s",
+    //           ifaceName, channelGroup));
+    //   newIface.deactivate(InactiveReason.INVALID);
+    // }
+
+    // newIface.setCryptoMap(iface.getCryptoMap());
+    // if (iface.getHsrpVersion() != null) {
+    //   newIface.setHsrpVersion(toString(iface.getHsrpVersion()));
+    // }
+    // newIface.setVrf(c.getVrfs().get(vrfName));
+    // newIface.setSpeed(
+    //     firstNonNull(
+    //         iface.getSpeed(),
+    //         Interface.getDefaultSpeed(iface.getName(), c.getConfigurationFormat())));
+    // newIface.setBandwidth(
+    //     firstNonNull(
+    //         iface.getBandwidth(),
+    //         newIface.getSpeed(),
+    //         Interface.getDefaultBandwidth(iface.getName(), c.getConfigurationFormat())));
+    // if (iface.getDhcpRelayClient()) {
+    //   newIface.setDhcpRelayAddresses(_dhcpRelayServers);
+    // } else {
+    //   newIface.setDhcpRelayAddresses(ImmutableList.copyOf(iface.getDhcpRelayAddresses()));
+    // }
+    // newIface.setMlagId(iface.getMlagId());
+    // newIface.setMtu(iface.getMtu());
+    // newIface.setProxyArp(iface.getProxyArp());
+    // newIface.setDeclaredNames(ImmutableSortedSet.copyOf(iface.getDeclaredNames()));
+    // newIface.setSwitchport(iface.getSwitchport());
+
+    // if (newIface.getSwitchport()) {
+    //   newIface.setSwitchportMode(iface.getSwitchportMode());
+
+    //   // switch settings
+    //   if (iface.getSwitchportMode() == SwitchportMode.ACCESS) {
+    //     newIface.setAccessVlan(firstNonNull(iface.getAccessVlan(), 1));
+    //   }
+
+    //   if (iface.getSwitchportMode() == SwitchportMode.TRUNK) {
+    //     SwitchportEncapsulationType encapsulation =
+    //         firstNonNull(
+    //             // TODO: check if this is OK
+    //             iface.getSwitchportTrunkEncapsulation(), SwitchportEncapsulationType.DOT1Q);
+    //     newIface.setSwitchportTrunkEncapsulation(encapsulation);
+    //     if (iface.getSwitchportMode() == SwitchportMode.TRUNK) {
+    //       /*
+    //        * Compute allowed VLANs:
+    //        * - If allowed VLANs are set, honor them;
+    //        */
+    //       if (iface.getAllowedVlans() != null) {
+    //         newIface.setAllowedVlans(iface.getAllowedVlans());
+    //       } else {
+    //         newIface.setAllowedVlans(Interface.ALL_VLANS);
+    //       }
+    //     }
+    //     newIface.setNativeVlan(firstNonNull(iface.getNativeVlan(), 1));
+    //   }
+
+    //   newIface.setSpanningTreePortfast(iface.getSpanningTreePortfast());
+    // } else {
+    //   newIface.setSwitchportMode(SwitchportMode.NONE);
+    //   if (newIface.getInterfaceType() == InterfaceType.VLAN) {
+    //     Integer vlan = Ints.tryParse(ifaceName.substring("vlan".length()));
+    //     newIface.setVlan(vlan);
+    //     if (vlan == null) {
+    //       _w.redFlag("Unable assign vlan for interface " + ifaceName);
+    //     }
+    //     newIface.setAutoState(iface.getAutoState());
+    //   }
+
+    //   // All prefixes is the combination of the interface prefix + any secondary prefixes.
+    //   ImmutableSet.Builder<InterfaceAddress> allPrefixes = ImmutableSet.builder();
+    //   if (iface.getAddress() != null) {
+    //     newIface.setAddress(iface.getAddress());
+    //     allPrefixes.add(iface.getAddress());
+    //   }
+    //   allPrefixes.addAll(iface.getSecondaryAddresses());
+    //   newIface.setAllAddresses(allPrefixes.build());
+
+    //   // subinterface settings
+    //   newIface.setEncapsulationVlan(iface.getEncapsulationVlan());
+    // }
+
+    // EigrpProcess eigrpProcess = null;
+    // if (iface.getAddress() != null) {
+    //   for (EigrpProcess process : vrf.getEigrpProcesses().values()) {
+    //     if (process.getNetworks().contains(iface.getAddress().getPrefix())) {
+    //       // Found a process on interface
+    //       if (eigrpProcess != null) {
+    //         // Cisco does not recommend running multiple EIGRP autonomous systems on the same
+    //         // interface
+    //         _w.redFlag("Interface: '" + iface.getName() + "' matches multiple EIGRP processes");
+    //         break;
+    //       }
+    //       eigrpProcess = process;
+    //     }
+    //   }
+    // }
+    // // Let toEigrpProcess handle null asn failure
+    // if (eigrpProcess != null && eigrpProcess.getAsn() != null) {
+    //   boolean passive =
+    //       eigrpProcess
+    //           .getInterfacePassiveStatus()
+    //           .getOrDefault(iface.getName(), eigrpProcess.getPassiveInterfaceDefault());
+
+    //   // Export distribute lists
+    //   String exportPolicyName =
+    //       eigrpNeighborExportPolicyName(ifaceName, vrfName, eigrpProcess.getAsn());
+    //   RoutingPolicy exportPolicy =
+    //       generateEigrpPolicy(
+    //           c,
+    //           this,
+    //           Arrays.asList(
+    //               eigrpProcess.getOutboundGlobalDistributeList(),
+    //               eigrpProcess.getOutboundInterfaceDistributeLists().get(ifaceName)),
+    //           ImmutableList.of(matchOwnAsn(eigrpProcess.getAsn())),
+    //           exportPolicyName);
+    //   c.getRoutingPolicies().put(exportPolicyName, exportPolicy);
+
+    //   // Import distribute lists
+    //   String importPolicyName =
+    //       eigrpNeighborImportPolicyName(ifaceName, vrfName, eigrpProcess.getAsn());
+    //   RoutingPolicy importPolicy =
+    //       generateEigrpPolicy(
+    //           c,
+    //           this,
+    //           Arrays.asList(
+    //               eigrpProcess.getInboundGlobalDistributeList(),
+    //               eigrpProcess.getInboundInterfaceDistributeLists().get(ifaceName)),
+    //           ImmutableList.of(),
+    //           importPolicyName);
+    //   c.getRoutingPolicies().put(importPolicyName, importPolicy);
+
+    //   newIface.setEigrp(
+    //       EigrpInterfaceSettings.builder()
+    //           .setAsn(eigrpProcess.getAsn())
+    //           .setEnabled(true)
+    //           .setExportPolicy(exportPolicyName)
+    //           .setImportPolicy(importPolicyName)
+    //           .setMetric(computeEigrpMetricForInterface(iface, eigrpProcess.getMode()))
+    //           .setPassive(passive)
+    //           .build());
+    //   if (newIface.getEigrp() == null) {
+    //     _w.redFlag("Interface: '" + iface.getName() + "' failed to set EIGRP settings");
+    //   }
+    // }
+
+    // boolean level1 = false;
+    // boolean level2 = false;
+    // IsisProcess isisProcess = vrf.getIsisProcess();
+    // if (isisProcess != null && iface.getIsisInterfaceMode() != IsisInterfaceMode.UNSET) {
+    //   switch (isisProcess.getLevel()) {
+    //     case LEVEL_1:
+    //       level1 = true;
+    //       break;
+    //     case LEVEL_1_2:
+    //       level1 = true;
+    //       level2 = true;
+    //       break;
+    //     case LEVEL_2:
+    //       level2 = true;
+    //       break;
+    //     default:
+    //       throw new VendorConversionException("Invalid IS-IS level");
+    //   }
+    //   IsisInterfaceSettings.Builder isisInterfaceSettingsBuilder = IsisInterfaceSettings.builder();
+    //   IsisInterfaceLevelSettings levelSettings =
+    //       IsisInterfaceLevelSettings.builder()
+    //           .setCost(iface.getIsisCost())
+    //           .setMode(iface.getIsisInterfaceMode())
+    //           .build();
+    //   if (level1) {
+    //     isisInterfaceSettingsBuilder.setLevel1(levelSettings);
+    //   }
+    //   if (level2) {
+    //     isisInterfaceSettingsBuilder.setLevel2(levelSettings);
+    //   }
+    //   newIface.setIsis(isisInterfaceSettingsBuilder.build());
+    // }
+
+    // String incomingFilterName = iface.getIncomingFilter();
+    // if (incomingFilterName != null) {
+    //   newIface.setIncomingFilter(c.getIpAccessLists().get(incomingFilterName));
+    // }
+    // String outgoingFilterName = iface.getOutgoingFilter();
+    // if (outgoingFilterName != null) {
+    //   newIface.setOutgoingFilter(c.getIpAccessLists().get(outgoingFilterName));
+    // }
+    // // Apply zone outgoing filter if necessary
+    // applyZoneFilter(iface, newIface, c);
+
+    // /*
+    //  * NAT rules are specified at the top level, but are applied as incoming transformations on the
+    //  * outside interface (outside-to-inside) and outgoing transformations on the outside interface
+    //  * (inside-to-outside)
+    //  *
+    //  * Currently, only static NATs have both incoming and outgoing transformations
+    //  */
+
+    // List<CiscoIosNat> ciscoIosNats = firstNonNull(_ciscoIosNats, ImmutableList.of());
+    // if (!ciscoIosNats.isEmpty()) {
+    //   generateCiscoIosNatTransformations(ifaceName, vrfName, newIface, c);
+    // }
+
+    // String routingPolicyName = iface.getRoutingPolicy();
+    // if (routingPolicyName != null) {
+    //   newIface.setPacketPolicy(routingPolicyName);
+    // }
+
+    // For IOS, FirewallSessionInterfaceInfo is created once for all NAT interfaces.
+    return newIface;
+  }
+
   @Override
-  public void setVendor(ConfigurationFormat format) {}
+  public void setVendor(ConfigurationFormat format) {
+    _vendor = format;
+  }
+
+  public ConfigurationFormat getVendor() {
+    return _vendor;
+  }
 
   @Override
   public List<Configuration> toVendorIndependentConfigurations() throws VendorConversionException {
@@ -116,6 +369,7 @@ public final class RgosConfiguration extends VendorConfiguration {
   private @Nonnull Map<Prefix, StaticRoute> _staticRoutes;
   private String _hostname;
   private String _version;
+  private ConfigurationFormat _vendor;
 
   private final Map<String, IpAsPathAccessList> _asPathAccessLists;
   private final Map<String, PrefixList> _prefixLists;
