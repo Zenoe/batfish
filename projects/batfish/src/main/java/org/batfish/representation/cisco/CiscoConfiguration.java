@@ -2395,7 +2395,6 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   @Override
   public List<Configuration> toVendorIndependentConfigurations() {
-    System.out.println(_interfaces.size());
     Configuration c = new Configuration(_hostname, _vendor);
     c.setHumanName(_rawHostname);
     // Only set CISCO_UNSPECIFIED if the device is actually a cisco device
@@ -3665,7 +3664,6 @@ public final class CiscoConfiguration extends VendorConfiguration {
    * Keyrings
    */
   private void resolveKeyringIsakmpProfileAddresses() {
-    System.out.println("resolveKeyringIsakmpProfileAddresses"+_interfaces.size());
     Map<String, Ip> ifaceNameToPrimaryIp = computeInterfaceOwnedPrimaryIp(_interfaces);
 
     _keyrings.values().stream()
@@ -3688,7 +3686,6 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   /** Resolves the addresses of the interfaces used in sourceInterfaceName of Tunnel interfaces */
   private void resolveTunnelSourceInterfaces() {
-    System.out.println("resolveTunnelSourceInterfaces" +_interfaces.size());
     Map<String, Ip> ifaceNameToPrimaryIp = computeInterfaceOwnedPrimaryIp(_interfaces);
 
     for (Interface iface : _interfaces.values()) {

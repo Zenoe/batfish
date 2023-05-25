@@ -5,9 +5,9 @@
 package org.batfish.grammar.rgos;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import com.google.common.collect.ImmutableSortedSet;
+// import com.google.common.collect.ImmutableSortedSet;
 
-import static java.util.Comparator.naturalOrder;
+// import static java.util.Comparator.naturalOrder;
 
 import com.google.common.collect.Range;
 import java.util.Optional;
@@ -19,6 +19,11 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.batfish.common.Warnings;
 import org.batfish.common.Warnings.ParseWarning;
+import org.batfish.datamodel.ConcreteInterfaceAddress;
+import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.Ip6;
+import org.antlr.v4.runtime.tree.TerminalNode;
+
 import org.batfish.datamodel.IntegerSpace;
 import org.batfish.datamodel.SubRange;
 import static org.batfish.representation.rgos.RgosStructureType.INTERFACE;
@@ -36,8 +41,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.batfish.grammar.rgos.RgosParser.S_interface_definitionContext;
-import org.batfish.grammar.rgos.RgosParser.S_interface_definitionContext;
+import org.batfish.grammar.rgos.RgosParser.S_hostnameContext;
 import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
+import org.batfish.grammar.rgos.RgosParser.If_ip_addressContext;
+
 
 import org.batfish.representation.rgos.Interface;
 import org.batfish.representation.rgos.Vrf;
@@ -47,7 +54,6 @@ import org.batfish.grammar.rgos.RgosParser.SubrangeContext;
 
 
 // import org.batfish.grammar.rgos.RgosParser.Host_nameContext;
-// import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
 // import org.batfish.grammar.rgos.RgosParser.Ipv4_addressContext;
 // import org.batfish.grammar.rgos.RgosParser.Ipv4_prefixContext;
 // import org.batfish.grammar.rgos.RgosParser.S_lineContext;
@@ -141,6 +147,22 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
   }
 
   @Override
+  public void exitS_hostname(S_hostnameContext ctx) {
+    String hostname;
+    if (ctx.quoted_name != null) {
+      hostname = unquote(ctx.quoted_name.getText());
+    } else {
+      StringBuilder sb = new StringBuilder();
+      for (Token namePart : ctx.name_parts) {
+        sb.append(namePart.getText());
+      }
+      hostname = sb.toString();
+    }
+    _configuration.setHostname(hostname);
+    _configuration.getRf().setHostname(hostname);
+  }
+
+  @Override
   public void enterS_interface_definition(S_interface_definitionContext ctx) {
     String nameAlpha = ctx.iname.name_prefix_alpha.getText();
     String canonicalNamePrefix;
@@ -181,6 +203,36 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
   }
 
   @Override
+  public void exitIf_ip_address(If_ip_addressContext ctx) {
+    ConcreteInterfaceAddress address;
+    if (ctx.prefix != null) {
+      address = ConcreteInterfaceAddress.parse(ctx.prefix.getText());
+    } else {
+      Ip ip = toIp(ctx.ip);
+      Ip mask = toIp(ctx.subnet);
+      address = ConcreteInterfaceAddress.create(ip, mask);
+    }
+    for (Interface currentInterface : _currentInterfaces) {
+      currentInterface.setAddress(address);
+    }
+    if (ctx.STANDBY() != null) {
+      Ip standbyIp = toIp(ctx.standby_address);
+      ConcreteInterfaceAddress standbyAddress =
+          ConcreteInterfaceAddress.create(standbyIp, address.getNetworkBits());
+      for (Interface currentInterface : _currentInterfaces) {
+        currentInterface.setStandbyAddress(standbyAddress);
+      }
+    }
+    if (ctx.ROUTE_PREFERENCE() != null) {
+      warn(ctx, "Unsupported: route-preference declared in interface IP address");
+    }
+    if (ctx.TAG() != null) {
+      warn(ctx, "Unsupported: tag declared in interface IP address");
+    }
+  }
+
+
+  @Override
   public void exitEveryRule(ParserRuleContext ctx) {
     tryProcessSilentSyntax(ctx);
   }
@@ -218,11 +270,11 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     } else {
       _w.pedantic("Interface: '" + name + "' altered more than once");
     }
-    newInterface.setDeclaredNames(
-        new ImmutableSortedSet.Builder<String>(naturalOrder())
-            .addAll(newInterface.getDeclaredNames())
-            .add(ctx.getText())
-            .build());
+    // newInterface.setDeclaredNames(
+    //     new ImmutableSortedSet.Builder<String>(naturalOrder())
+    //         .addAll(newInterface.getDeclaredNames())
+    //         .add(ctx.getText())
+    //         .build());
     if (explicit) {
       _currentInterfaces.add(newInterface);
     }
@@ -231,6 +283,7 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
 
 
   private void initInterface(Interface iface, Interface_nameContext ctx) {
+    System.out.println("initinterface----");
     String nameAlpha = ctx.name_prefix_alpha.getText();
     String canonicalNamePrefix = RgosConfiguration.getCanonicalInterfaceNamePrefix(nameAlpha);
     String vrf =
@@ -245,6 +298,21 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
 
   private Vrf initVrf(String vrfName) {
     return _configuration.getVrfs().computeIfAbsent(vrfName, Vrf::new);
+  }
+  private static Ip toIp(TerminalNode t) {
+    return Ip.parse(t.getText());
+  }
+
+  private static Ip toIp(Token t) {
+    return Ip.parse(t.getText());
+  }
+
+  private static Ip6 toIp6(Token t) {
+    return Ip6.parse(t.getText());
+  }
+
+  private static long toLong(DecContext ctx) {
+    return Long.parseLong(ctx.getText());
   }
 
   private static SubRange toSubRange(SubrangeContext ctx) {

@@ -1,14 +1,14 @@
 package org.batfish.representation.rgos;
 
 import java.io.Serializable;
-// import java.util.HashMap;
+import java.util.HashMap;
 // import java.util.HashSet;
 // import java.util.LinkedHashMap;
-// import java.util.Map;
+import java.util.Map;
 // import java.util.Set;
 // import java.util.TreeMap;
 import javax.annotation.Nonnull;
-// import javax.annotation.Nullable;
+import javax.annotation.Nullable;
 // import org.batfish.datamodel.bgp.RouteDistinguisher;
 
 public final class Vrf implements Serializable {
@@ -25,12 +25,12 @@ public final class Vrf implements Serializable {
   // @Nonnull private final Set<StaticRoute> _staticRoutes;
   // @Nullable private Integer _vni;
 
-  // @Nonnull private final Map<AddressFamilyType, VrfAddressFamily> _addressFamilies;
-  // @Nonnull private final VrfAddressFamily _genericAddressFamily;
+  @Nonnull private final Map<AddressFamilyType, VrfAddressFamily> _addressFamilies;
+  @Nonnull private final VrfAddressFamily _genericAddressFamily;
 
   public Vrf(@Nonnull String name) {
-    // _addressFamilies = new HashMap<>(4);
-    // _genericAddressFamily = new VrfAddressFamily();
+    _addressFamilies = new HashMap<>(4);
+    _genericAddressFamily = new VrfAddressFamily();
     // _eigrpProcesses = new TreeMap<>();
     // _name = name;
     // // Ensure that processes are in insertion order.
@@ -58,11 +58,11 @@ public final class Vrf implements Serializable {
   //   return _isisProcess;
   // }
 
-  // /** Configuration available under address-family ipv4 (unicast). */
-  // @Nullable
-  // public VrfAddressFamily getIpv4UnicastAddressFamily() {
-  //   return _addressFamilies.get(AddressFamilyType.IPV4_UNICAST);
-  // }
+  /** Configuration available under address-family ipv4 (unicast). */
+  @Nullable
+  public VrfAddressFamily getIpv4UnicastAddressFamily() {
+    return _addressFamilies.get(AddressFamilyType.IPV4_UNICAST);
+  }
 
   // @Nonnull
   // public VrfAddressFamily getOrCreateIpv4UnicastAddressFamily() {
@@ -75,10 +75,10 @@ public final class Vrf implements Serializable {
   //  * inherit these if unset at the AF level. Note that not all commands can be typed at the VRF
   //  * level. We rely on the parser/extractor to avoid impossible configurations.
   //  */
-  // @Nonnull
-  // public VrfAddressFamily getGenericAddressFamilyConfig() {
-  //   return _genericAddressFamily;
-  // }
+  @Nonnull
+  public VrfAddressFamily getGenericAddressFamilyConfig() {
+    return _genericAddressFamily;
+  }
 
   // @Nonnull
   // public String getName() {

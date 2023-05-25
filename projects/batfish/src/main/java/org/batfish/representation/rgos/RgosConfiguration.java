@@ -1,20 +1,53 @@
 package org.batfish.representation.rgos;
+import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
+
 import static org.batfish.representation.rgos.RgosConversions.convertStaticRoutes;
 import static org.batfish.datamodel.Interface.computeInterfaceType;
 
 // import org.batfish.common.BatfishException;
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.NavigableSet;
+import java.util.TreeSet;
+
+
 import javax.annotation.Nonnull;
 import org.batfish.common.VendorConversionException;
+
+import org.batfish.datamodel.vendor_family.rgos.RgosFamily;
+import org.batfish.datamodel.Ip;
+import org.batfish.datamodel.SubRange;
+
+// import static org.batfish.datamodel.Interface.computeInterfaceType;
+import org.batfish.datamodel.InterfaceType;
+
+
+// import org.batfish.datamodel.ConcreteInterfaceAddress;
+import org.batfish.datamodel.SwitchportMode;
 import org.batfish.datamodel.Configuration;
 import org.batfish.datamodel.ConfigurationFormat;
 import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.IntegerSpace;
+// import static org.batfish.datamodel.routing_policy.Common.matchDefaultRoute;
+
 import org.batfish.vendor.VendorConfiguration;
+import com.google.common.collect.ImmutableSortedSet;
+import org.batfish.datamodel.SwitchportEncapsulationType;
+import org.batfish.datamodel.InterfaceAddress;
+
+import com.google.common.primitives.Ints;
+import com.google.common.collect.ImmutableSet;
+
+// import org.batfish.datamodel.routing_policy.statement.Statement;
+// import org.batfish.datamodel.routing_policy.statement.Statements;
+
+// import org.batfish.datamodel.routing_policy.statement.If;
+
 
 /** Vendor-specific data model for example Cool NOS configuration. */
 public final class RgosConfiguration extends VendorConfiguration {
@@ -37,6 +70,10 @@ public final class RgosConfiguration extends VendorConfiguration {
     _staticRoutes = new HashMap<>();
     _interfaces = new TreeMap<>();
     _vrfs = new TreeMap<>();
+    _rf = new RgosFamily();
+    _dhcpRelayServers = new ArrayList<>();
+    _dnsServers = new TreeSet<>();
+
     _vrfs.put(Configuration.DEFAULT_VRF_NAME, new Vrf(Configuration.DEFAULT_VRF_NAME));
 
   }
@@ -50,13 +87,78 @@ public final class RgosConfiguration extends VendorConfiguration {
       .setDefaultInboundAction(LineAction.PERMIT)
       .build();
 
-    convertStaticRoutes(this, c);
-    // StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
-
-    // for (StackTraceElement element : stackTraceElements) {
-    //   System.out.println(element.getClassName() + "." + element.getMethodName()
-    //                      + "(" + element.getFileName() + ":" + element.getLineNumber() + ")");
+    c.getVendorFamily().setRgos(_rf);
+    c.setDefaultInboundAction(LineAction.PERMIT);
+    c.setDefaultCrossZoneAction(LineAction.PERMIT);
+    c.setDnsServers(_dnsServers);
+    // c.setDnsSourceInterface(_dnsSourceInterface);
+    // c.setDomainName(_domainName);
+    // c.setExportBgpFromBgpRib(true);
+    c.setNormalVlanRange(
+        IntegerSpace.of(new SubRange(VLAN_NORMAL_MIN_RGOS, VLAN_NORMAL_MAX_RGOS)));
+    // c.setTacacsServers(toTacacsServers(_tacacsServers, _aaaServerGroups));
+    // c.setTacacsSourceInterface(_tacacsSourceInterface);
+    // c.setNtpSourceInterface(_ntpSourceInterface);
+    // if (_rf.getNtp() != null) {
+    //   c.setNtpServers(new TreeSet<>(_rf.getNtp().getServers().keySet()));
     // }
+    // if (_rf.getLogging() != null) {
+    //   c.setLoggingSourceInterface(_rf.getLogging().getSourceInterface());
+    //   c.setLoggingServers(new TreeSet<>(_rf.getLogging().getHosts().keySet()));
+    // }
+    // c.setSnmpSourceInterface(_snmpSourceInterface);
+
+    // for (Line line : _rf.getLines().values()) {
+    //   String list = line.getLoginAuthentication();
+    //   if (list == null) {
+    //     continue;
+    //   }
+    //   boolean found = false;
+    //   Aaa aaa = _rf.getAaa();
+    //   if (aaa != null) {
+    //     AaaAuthentication authentication = aaa.getAuthentication();
+    //     if (authentication != null) {
+    //       AaaAuthenticationLogin login = authentication.getLogin();
+    //       if (login != null && login.getLists().containsKey(list)) {
+    //         found = true;
+    //       }
+    //     }
+    //   }
+    //   if (!found) {
+    //     line.setLoginAuthentication(null);
+    //   }
+    // }
+
+    // RoutingPolicy.builder()
+    //     .setOwner(c)
+    //     .setName(RESOLUTION_POLICY_NAME)
+    //     .setStatements(
+    //         ImmutableList.of(
+    //             new If(
+    //                 matchDefaultRoute(),
+    //                 ImmutableList.of(Statements.ReturnFalse.toStaticStatement()),
+    //                 ImmutableList.of(Statements.ReturnTrue.toStaticStatement()))))
+    //     .build();
+
+    // initialize vrfs
+    for (String vrfName : _vrfs.keySet()) {
+      c.getVrfs()
+          .put(
+              vrfName,
+              org.batfish.datamodel.Vrf.builder()
+                  .setName(vrfName)
+                  .setResolutionPolicy(RESOLUTION_POLICY_NAME)
+                  .build());
+      // inherit address family props
+      Vrf vrf = _vrfs.get(vrfName);
+      VrfAddressFamily ip4uaf = vrf.getIpv4UnicastAddressFamily();
+      if (ip4uaf == null) {
+        continue;
+      }
+      ip4uaf.inherit(vrf.getGenericAddressFamilyConfig());
+    }
+
+    convertStaticRoutes(this, c);
 
     _interfaces.forEach(
         (ifaceName, iface) -> {
@@ -69,8 +171,11 @@ public final class RgosConfiguration extends VendorConfiguration {
           // }
           // c.getAllInterfaces().put(newIfaceName, newInterface);
         });
-    System.out.println("toVendorIndependentConfiguration"+_hostname);
     return c;
+  }
+
+  public NavigableSet<String> getDnsServers() {
+    return _dnsServers;
   }
 
   public Map<String, Interface> getInterfaces() {
@@ -95,6 +200,15 @@ public final class RgosConfiguration extends VendorConfiguration {
     return _staticRoutes;
   }
 
+  public boolean getSpanningTreePortfastDefault() {
+    return _spanningTreePortfastDefault;
+  }
+
+  public void setSpanningTreePortfastDefault(boolean spanningTreePortfastDefault) {
+    _spanningTreePortfastDefault = spanningTreePortfastDefault;
+  }
+
+
   private org.batfish.datamodel.Interface toInterface(
       String ifaceName, Interface iface, Configuration c) {
     org.batfish.datamodel.Interface newIface =
@@ -103,12 +217,12 @@ public final class RgosConfiguration extends VendorConfiguration {
             .setOwner(c)
             .setType(computeInterfaceType(iface.getName(), c.getConfigurationFormat()))
             .build();
-    // String vrfName = iface.getVrf();
-    // Vrf vrf = _vrfs.computeIfAbsent(vrfName, Vrf::new);
-    // newIface.setDescription(iface.getDescription());
-    // if (!iface.getActive()) {
-    //   newIface.adminDown();
-    // }
+    String vrfName = iface.getVrf();
+    Vrf vrf = _vrfs.computeIfAbsent(vrfName, Vrf::new);
+    newIface.setDescription(iface.getDescription());
+    if (!iface.getActive()) {
+      newIface.adminDown();
+    }
     // String channelGroup = iface.getChannelGroup();
     // newIface.setChannelGroup(channelGroup);
     // if (iface.getActive() && channelGroup != null && !_interfaces.containsKey(channelGroup)) {
@@ -120,82 +234,79 @@ public final class RgosConfiguration extends VendorConfiguration {
     // }
 
     // newIface.setCryptoMap(iface.getCryptoMap());
-    // if (iface.getHsrpVersion() != null) {
-    //   newIface.setHsrpVersion(toString(iface.getHsrpVersion()));
-    // }
-    // newIface.setVrf(c.getVrfs().get(vrfName));
-    // newIface.setSpeed(
-    //     firstNonNull(
-    //         iface.getSpeed(),
-    //         Interface.getDefaultSpeed(iface.getName(), c.getConfigurationFormat())));
-    // newIface.setBandwidth(
-    //     firstNonNull(
-    //         iface.getBandwidth(),
-    //         newIface.getSpeed(),
-    //         Interface.getDefaultBandwidth(iface.getName(), c.getConfigurationFormat())));
-    // if (iface.getDhcpRelayClient()) {
-    //   newIface.setDhcpRelayAddresses(_dhcpRelayServers);
-    // } else {
-    //   newIface.setDhcpRelayAddresses(ImmutableList.copyOf(iface.getDhcpRelayAddresses()));
-    // }
-    // newIface.setMlagId(iface.getMlagId());
-    // newIface.setMtu(iface.getMtu());
-    // newIface.setProxyArp(iface.getProxyArp());
-    // newIface.setDeclaredNames(ImmutableSortedSet.copyOf(iface.getDeclaredNames()));
-    // newIface.setSwitchport(iface.getSwitchport());
+    newIface.setVrf(c.getVrfs().get(vrfName));
+    newIface.setSpeed(
+        firstNonNull(
+            iface.getSpeed(),
+            Interface.getDefaultSpeed(iface.getName(), c.getConfigurationFormat())));
+    newIface.setBandwidth(
+        firstNonNull(
+            iface.getBandwidth(),
+            newIface.getSpeed(),
+            Interface.getDefaultBandwidth(iface.getName(), c.getConfigurationFormat())));
+    if (iface.getDhcpRelayClient()) {
+      newIface.setDhcpRelayAddresses(_dhcpRelayServers);
+    } else {
+      newIface.setDhcpRelayAddresses(ImmutableList.copyOf(iface.getDhcpRelayAddresses()));
+    }
+    newIface.setMlagId(iface.getMlagId());
+    newIface.setMtu(iface.getMtu());
+    newIface.setProxyArp(iface.getProxyArp());
+    newIface.setDeclaredNames(ImmutableSortedSet.copyOf(iface.getDeclaredNames()));
+    newIface.setSwitchport(iface.getSwitchport());
 
-    // if (newIface.getSwitchport()) {
-    //   newIface.setSwitchportMode(iface.getSwitchportMode());
+    if (newIface.getSwitchport()) {
+      newIface.setSwitchportMode(iface.getSwitchportMode());
 
-    //   // switch settings
-    //   if (iface.getSwitchportMode() == SwitchportMode.ACCESS) {
-    //     newIface.setAccessVlan(firstNonNull(iface.getAccessVlan(), 1));
-    //   }
+      // switch settings
+      if (iface.getSwitchportMode() == SwitchportMode.ACCESS) {
+        newIface.setAccessVlan(firstNonNull(iface.getAccessVlan(), 1));
+      }
 
-    //   if (iface.getSwitchportMode() == SwitchportMode.TRUNK) {
-    //     SwitchportEncapsulationType encapsulation =
-    //         firstNonNull(
-    //             // TODO: check if this is OK
-    //             iface.getSwitchportTrunkEncapsulation(), SwitchportEncapsulationType.DOT1Q);
-    //     newIface.setSwitchportTrunkEncapsulation(encapsulation);
-    //     if (iface.getSwitchportMode() == SwitchportMode.TRUNK) {
-    //       /*
-    //        * Compute allowed VLANs:
-    //        * - If allowed VLANs are set, honor them;
-    //        */
-    //       if (iface.getAllowedVlans() != null) {
-    //         newIface.setAllowedVlans(iface.getAllowedVlans());
-    //       } else {
-    //         newIface.setAllowedVlans(Interface.ALL_VLANS);
-    //       }
-    //     }
-    //     newIface.setNativeVlan(firstNonNull(iface.getNativeVlan(), 1));
-    //   }
+      if (iface.getSwitchportMode() == SwitchportMode.TRUNK) {
+        SwitchportEncapsulationType encapsulation =
+            firstNonNull(
+                // TODO: check if this is OK
+                iface.getSwitchportTrunkEncapsulation(), SwitchportEncapsulationType.DOT1Q);
+        newIface.setSwitchportTrunkEncapsulation(encapsulation);
+        if (iface.getSwitchportMode() == SwitchportMode.TRUNK) {
+          /*
+           * Compute allowed VLANs:
+           * - If allowed VLANs are set, honor them;
+           */
+          if (iface.getAllowedVlans() != null) {
+            newIface.setAllowedVlans(iface.getAllowedVlans());
+          } else {
+            newIface.setAllowedVlans(Interface.ALL_VLANS);
+          }
+        }
+        newIface.setNativeVlan(firstNonNull(iface.getNativeVlan(), 1));
+      }
 
-    //   newIface.setSpanningTreePortfast(iface.getSpanningTreePortfast());
-    // } else {
-    //   newIface.setSwitchportMode(SwitchportMode.NONE);
-    //   if (newIface.getInterfaceType() == InterfaceType.VLAN) {
-    //     Integer vlan = Ints.tryParse(ifaceName.substring("vlan".length()));
-    //     newIface.setVlan(vlan);
-    //     if (vlan == null) {
-    //       _w.redFlag("Unable assign vlan for interface " + ifaceName);
-    //     }
-    //     newIface.setAutoState(iface.getAutoState());
-    //   }
+      newIface.setSpanningTreePortfast(iface.getSpanningTreePortfast());
+    } else {
+      newIface.setSwitchportMode(SwitchportMode.NONE);
+      if (newIface.getInterfaceType() == InterfaceType.VLAN) {
+        Integer vlan = Ints.tryParse(ifaceName.substring("vlan".length()));
+        newIface.setVlan(vlan);
+        if (vlan == null) {
+          _w.redFlag("Unable assign vlan for interface " + ifaceName);
+        }
+        newIface.setAutoState(iface.getAutoState());
+      }
 
-    //   // All prefixes is the combination of the interface prefix + any secondary prefixes.
-    //   ImmutableSet.Builder<InterfaceAddress> allPrefixes = ImmutableSet.builder();
-    //   if (iface.getAddress() != null) {
-    //     newIface.setAddress(iface.getAddress());
-    //     allPrefixes.add(iface.getAddress());
-    //   }
-    //   allPrefixes.addAll(iface.getSecondaryAddresses());
-    //   newIface.setAllAddresses(allPrefixes.build());
+      // All prefixes is the combination of the interface prefix + any secondary prefixes.
+      ImmutableSet.Builder<InterfaceAddress> allPrefixes = ImmutableSet.builder();
+      if (iface.getAddress() != null) {
+        newIface.setAddress(iface.getAddress());
+        allPrefixes.add(iface.getAddress());
+      }
+      allPrefixes.addAll(iface.getSecondaryAddresses());
+      newIface.setAllAddresses(allPrefixes.build());
 
-    //   // subinterface settings
-    //   newIface.setEncapsulationVlan(iface.getEncapsulationVlan());
-    // }
+      // subinterface settings
+      newIface.setEncapsulationVlan(iface.getEncapsulationVlan());
+    }
 
     // EigrpProcess eigrpProcess = null;
     // if (iface.getAddress() != null) {
@@ -356,19 +467,36 @@ public final class RgosConfiguration extends VendorConfiguration {
     return _vrfs.get(Configuration.DEFAULT_VRF_NAME);
   }
 
+  public RgosFamily getRf() {
+    return _rf;
+  }
+
+  public List<Ip> getDhcpRelayServers() {
+    return _dhcpRelayServers;
+  }
 
   public static final String DEFAULT_VRF_NAME = "default";
 
   public static final String MANAGEMENT_VRF_NAME = "management";
 
   public static final String MANAGEMENT_INTERFACE_PREFIX = "mgmt";
+  public static final String RESOLUTION_POLICY_NAME = "~RESOLUTION_POLICY~";
+
+  private static final int VLAN_NORMAL_MAX_RGOS = 4096;
+
+  private static final int VLAN_NORMAL_MIN_RGOS = 2;
 
   private final Map<String, Interface> _interfaces;
+  private final RgosFamily _rf;
+  private final List<Ip> _dhcpRelayServers;
+  private boolean _spanningTreePortfastDefault;
 
   // Note: For simplicity, in Cool NOS, you can only have one static route per prefix.
   private @Nonnull Map<Prefix, StaticRoute> _staticRoutes;
   private String _hostname;
   private String _version;
+  private NavigableSet<String> _dnsServers;
+
   private ConfigurationFormat _vendor;
 
   private final Map<String, IpAsPathAccessList> _asPathAccessLists;

@@ -7,6 +7,7 @@ import java.io.Serializable;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.batfish.datamodel.vendor_family.rgos.RgosFamily;
 import org.batfish.datamodel.vendor_family.cisco.CiscoFamily;
 import org.batfish.datamodel.vendor_family.cisco_nxos.CiscoNxosFamily;
 import org.batfish.datamodel.vendor_family.cisco_xr.CiscoXrFamily;
@@ -17,6 +18,7 @@ import org.batfish.datamodel.vendor_family.juniper.JuniperFamily;
 public class VendorFamily implements Serializable {
 
   public enum Type {
+    RGOS,
     AWS,
     CISCO,
     CISCO_NXOS,
@@ -27,6 +29,7 @@ public class VendorFamily implements Serializable {
     UNKNOWN
   }
 
+  private static final String PROP_RGOS = "rgos";
   private static final String PROP_AWS = "aws";
   private static final String PROP_CISCO = "cisco";
   private static final String PROP_CISCO_NXOS = "cisco_nxos";
@@ -49,17 +52,26 @@ public class VendorFamily implements Serializable {
       return Type.F5_BIGIP;
     } else if (family instanceof JuniperFamily) {
       return Type.JUNIPER;
+    } else if(family instanceof RgosFamily){
+      return Type.RGOS;
     }
     return Type.UNKNOWN;
   }
 
   private AwsFamily _aws;
   private CiscoFamily _cisco;
+  private RgosFamily _rgos;
   private CiscoNxosFamily _ciscoNxos;
   private CiscoXrFamily _ciscoXr;
   private CumulusFamily _cumulus;
   private F5BigipFamily _f5Bigip;
   private JuniperFamily _juniper;
+
+
+  @JsonProperty(PROP_RGOS)
+  public RgosFamily getRgos() {
+    return _rgos;
+  }
 
   @JsonProperty(PROP_AWS)
   public AwsFamily getAws() {
@@ -106,6 +118,11 @@ public class VendorFamily implements Serializable {
     _cisco = cisco;
   }
 
+  @JsonProperty(PROP_RGOS)
+  public void setRgos(RgosFamily rgos) {
+    _rgos = rgos;
+  }
+
   @JsonProperty(PROP_CISCO_NXOS)
   public void setCiscoNxos(CiscoNxosFamily ciscoNxos) {
     _ciscoNxos = ciscoNxos;
@@ -138,7 +155,7 @@ public class VendorFamily implements Serializable {
   /** Concatenates all non-null family pointers */
   @Override
   public String toString() {
-    return Stream.of(_aws, _cisco, _ciscoNxos, _ciscoXr, _cumulus, _f5Bigip, _juniper)
+    return Stream.of(_rgos, _aws, _cisco, _ciscoNxos, _ciscoXr, _cumulus, _f5Bigip, _juniper)
         .filter(Objects::nonNull)
         .map(f -> Objects.toString(toFamilyType(f)))
         .collect(Collectors.joining(" "));

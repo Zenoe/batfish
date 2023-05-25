@@ -46,7 +46,7 @@ public class Interface implements Serializable {
    *
    * <p>See https://bst.cloudapps.cisco.com/bugsearch/bug/CSCse69736
    */
-  private static final double TUNNEL_IOS_BANDWIDTH = 100E3D;
+  private static final double TUNNEL_BANDWIDTH = 100E3D;
 
   /**
    * Tunnel delay in picoseconds for IOS (checked in IOS 16.4)
@@ -67,8 +67,8 @@ public class Interface implements Serializable {
       return null;
     } else if (name.startsWith("Vlan")) {
       return DEFAULT_VLAN_BANDWIDTH;
-    } else if (format == ConfigurationFormat.CISCO_IOS && name.startsWith("Tunnel")) {
-      return TUNNEL_IOS_BANDWIDTH;
+    } else if (name.startsWith("Tunnel")) {
+      return TUNNEL_BANDWIDTH;
     } else {
       // Use default bandwidth for other interface types that have no speed
       return DEFAULT_INTERFACE_BANDWIDTH;
@@ -86,6 +86,7 @@ public class Interface implements Serializable {
         case CISCO_IOS:
         case FORCE10:
         case FOUNDRY:
+        case RGOS:
           return DEFAULT_IOS_ETHERNET_SPEED;
 
         case AWS:
@@ -217,6 +218,7 @@ public class Interface implements Serializable {
 
   private SwitchportEncapsulationType _switchportTrunkEncapsulation;
 
+  private boolean _spanningTreePortfast;
 
   private String _vrf;
 
@@ -273,7 +275,7 @@ public class Interface implements Serializable {
    */
   public static SwitchportMode getUndeclaredDefaultSwitchportMode(ConfigurationFormat vendor) {
     switch (vendor) {
-      case CISCO_IOS:
+      case RGOS:
         return SwitchportMode.DYNAMIC_AUTO;
       default:
         return SwitchportMode.ACCESS;
@@ -290,6 +292,7 @@ public class Interface implements Serializable {
     _name = name;
     _secondaryAddresses = new LinkedHashSet<>();
     setProxyArp(true);
+    _spanningTreePortfast = c.getSpanningTreePortfastDefault();
 
     // ConfigurationFormat vendor = c.getVendor();
     // switch (vendor) {
@@ -496,6 +499,10 @@ public class Interface implements Serializable {
     return _vrf;
   }
 
+  public boolean getSpanningTreePortfast() {
+    return _spanningTreePortfast;
+  }
+
   public void setAccessVlan(int vlan) {
     _accessVlan = vlan;
   }
@@ -656,6 +663,9 @@ public class Interface implements Serializable {
 
   public void setSecurityZone(String securityZone) {
     _securityZone = securityZone;
+  }
+  public void setSpanningTreePortfast(boolean spanningTreePortfast) {
+    _spanningTreePortfast = spanningTreePortfast;
   }
 
 }
