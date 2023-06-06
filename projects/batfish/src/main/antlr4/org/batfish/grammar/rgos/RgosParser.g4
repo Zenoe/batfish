@@ -11,6 +11,39 @@ options {
    tokenVocab = RgosLexer;
 }
 
+domain_lookup
+:
+   LOOKUP
+   (
+      SOURCE_INTERFACE iname = interface_name
+      | DISABLE
+   ) NEWLINE
+;
+
+domain_name
+:
+   NAME hostname = variable_hostname NEWLINE
+;
+
+domain_name_server
+:
+   NAME_SERVER hostname = variable_hostname NEWLINE
+;
+
+s_domain
+:
+   DOMAIN
+   (
+      VRF vrf = variable
+   )?
+   (
+      domain_lookup
+      | domain_name
+      | domain_name_server
+   )
+;
+
+
 rgos_configuration
 :
    NEWLINE?
@@ -29,5 +62,6 @@ stanza
    s_hostname
    | s_interface_line
    | s_interface
+   | s_domain
    | s_version
 ;

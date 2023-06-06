@@ -185,6 +185,7 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
           String name = namePrefix.toString() + i;
           addInterface(name, ctx.iname, true);
           _configuration.defineStructure(INTERFACE, name, ctx);
+          System.out.println("ctx.getStart().getLine()--------" + ctx.getStart().getLine());
           _configuration.referenceStructure(
               INTERFACE, name, INTERFACE_SELF_REF, ctx.getStart().getLine());
         }

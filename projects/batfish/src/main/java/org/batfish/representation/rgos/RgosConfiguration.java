@@ -1,7 +1,6 @@
 package org.batfish.representation.rgos;
 import static org.apache.commons.lang3.ObjectUtils.firstNonNull;
 
-import static org.batfish.representation.rgos.RgosConversions.convertStaticRoutes;
 import static org.batfish.datamodel.Interface.computeInterfaceType;
 
 // import org.batfish.common.BatfishException;
@@ -13,10 +12,13 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.NavigableSet;
 import java.util.TreeSet;
+import java.util.HashSet;
+import java.util.Set;
 
 
 import javax.annotation.Nonnull;
 import org.batfish.common.VendorConversionException;
+import org.batfish.datamodel.bgp.community.Community;
 
 import org.batfish.datamodel.vendor_family.rgos.RgosFamily;
 import org.batfish.datamodel.Ip;
@@ -24,6 +26,21 @@ import org.batfish.datamodel.SubRange;
 
 // import static org.batfish.datamodel.Interface.computeInterfaceType;
 import org.batfish.datamodel.InterfaceType;
+
+import org.batfish.datamodel.routing_policy.communities.CommunitySetMatchExpr;
+import org.batfish.datamodel.routing_policy.communities.CommunitySetAcl;
+import org.batfish.datamodel.routing_policy.communities.CommunityMatchExpr;
+import org.batfish.datamodel.routing_policy.communities.CommunityAclLine;
+import org.batfish.datamodel.routing_policy.communities.CommunityAcl;
+import org.batfish.datamodel.routing_policy.communities.CommunitySetAclLine;
+import org.batfish.datamodel.routing_policy.communities.CommunitySetMatchAll;
+import org.batfish.datamodel.routing_policy.communities.HasCommunity;
+import org.batfish.datamodel.routing_policy.communities.CommunityIs;
+import org.batfish.datamodel.routing_policy.communities.LiteralCommunitySet;
+import org.batfish.datamodel.routing_policy.communities.CommunityIn;
+import org.batfish.datamodel.routing_policy.communities.CommunityIs;
+import org.batfish.datamodel.routing_policy.communities.CommunitySet;
+
 
 
 // import org.batfish.datamodel.ConcreteInterfaceAddress;
@@ -34,9 +51,12 @@ import org.batfish.datamodel.LineAction;
 import org.batfish.datamodel.Prefix;
 import org.batfish.datamodel.IntegerSpace;
 // import static org.batfish.datamodel.routing_policy.Common.matchDefaultRoute;
+import org.batfish.datamodel.AsPathAccessList;
 
 import org.batfish.vendor.VendorConfiguration;
 import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Iterables;
+
 import org.batfish.datamodel.SwitchportEncapsulationType;
 import org.batfish.datamodel.InterfaceAddress;
 
@@ -48,8 +68,6 @@ import com.google.common.collect.ImmutableSet;
 
 // import org.batfish.datamodel.routing_policy.statement.If;
 
-
-/** Vendor-specific data model for example Cool NOS configuration. */
 public final class RgosConfiguration extends VendorConfiguration {
   public static String getCanonicalInterfaceNamePrefix(String prefix) {
     return prefix;
@@ -73,7 +91,8 @@ public final class RgosConfiguration extends VendorConfiguration {
     _rf = new RgosFamily();
     _dhcpRelayServers = new ArrayList<>();
     _dnsServers = new TreeSet<>();
-
+    _standardCommunityLists = new TreeMap<>();
+    _expandedCommunityLists = new TreeMap<>();
     _vrfs.put(Configuration.DEFAULT_VRF_NAME, new Vrf(Configuration.DEFAULT_VRF_NAME));
 
   }
@@ -157,8 +176,18 @@ public final class RgosConfiguration extends VendorConfiguration {
       }
       ip4uaf.inherit(vrf.getGenericAddressFamilyConfig());
     }
+    // // snmp server
+    // if (_snmpServer != null) {
+    //   String snmpServerVrf = _snmpServer.getVrf();
+    //   c.getVrfs().get(snmpServerVrf).setSnmpServer(_snmpServer);
+    // }
 
-    convertStaticRoutes(this, c);
+    // convert as path access lists to vendor independent format
+    for (IpAsPathAccessList pathList : _asPathAccessLists.values()) {
+      AsPathAccessList apList = RgosConversions.toAsPathAccessList(pathList);
+      c.getAsPathAccessLists().put(apList.getName(), apList);
+    }
+    convertIpCommunityLists(c);
 
     _interfaces.forEach(
         (ifaceName, iface) -> {
@@ -475,6 +504,98 @@ public final class RgosConfiguration extends VendorConfiguration {
     return _dhcpRelayServers;
   }
 
+  public Map<String, StandardCommunityList> getStandardCommunityLists() {
+    return _standardCommunityLists;
+  }
+
+  public Map<String, ExpandedCommunityList> getExpandedCommunityLists() {
+    return _expandedCommunityLists;
+  }
+
+
+  private void convertIpCommunityLists(Configuration c) {
+    // create CommunitySetMatchExpr for route-map match community
+    _standardCommunityLists.forEach(
+        (name, ipCommunityListStandard) ->
+            c.getCommunitySetMatchExprs()
+                .put(name, toCommunitySetMatchExpr(ipCommunityListStandard)));
+    _expandedCommunityLists.forEach(
+        (name, ipCommunityListExpanded) ->
+            c.getCommunitySetMatchExprs()
+                .put(name, toCommunitySetMatchExpr(ipCommunityListExpanded)));
+
+    // create CommunityMatchExpr for route-map set comm-list delete
+    _standardCommunityLists.forEach(
+        (name, ipCommunityListStandard) ->
+            c.getCommunityMatchExprs().put(name, toCommunityMatchExpr(ipCommunityListStandard)));
+    _expandedCommunityLists.forEach(
+        (name, ipCommunityListExpanded) ->
+            c.getCommunityMatchExprs().put(name, toCommunityMatchExpr(ipCommunityListExpanded)));
+  }
+
+
+  private static @Nonnull CommunityAclLine toCommunityAclLine(ExpandedCommunityListLine line) {
+    return new CommunityAclLine(
+                                line.getAction(), RgosConversions.toCommunityMatchRegex(line.getRegex()));
+  }
+
+  private static @Nonnull CommunitySetAclLine toCommunitySetAclLine(
+      StandardCommunityListLine line) {
+    return new CommunitySetAclLine(
+        line.getAction(),
+        CommunitySetMatchAll.matchAll(
+            line.getCommunities().stream()
+                .map(community -> new HasCommunity(new CommunityIs(community)))
+                .collect(ImmutableSet.toImmutableSet())));
+  }
+
+  private static @Nonnull CommunityMatchExpr toCommunityMatchExpr(
+      ExpandedCommunityList ipCommunityListExpanded) {
+    return CommunityAcl.acl(
+        ipCommunityListExpanded.getLines().stream()
+            .map(RgosConfiguration::toCommunityAclLine)
+            .collect(ImmutableList.toImmutableList()));
+  }
+
+  private static @Nonnull CommunityMatchExpr toCommunityMatchExpr(
+      StandardCommunityList ipCommunityListStandard) {
+    Set<Community> whitelist = new HashSet<>();
+    Set<Community> blacklist = new HashSet<>();
+    for (StandardCommunityListLine line : ipCommunityListStandard.getLines()) {
+      if (line.getCommunities().size() != 1) {
+        continue;
+      }
+      Community community = Iterables.getOnlyElement(line.getCommunities());
+      if (line.getAction() == LineAction.PERMIT) {
+        if (!blacklist.contains(community)) {
+          whitelist.add(community);
+        }
+      } else {
+        // DENY
+        if (!whitelist.contains(community)) {
+          blacklist.add(community);
+        }
+      }
+    }
+    return new CommunityIn(new LiteralCommunitySet(CommunitySet.of(whitelist)));
+  }
+
+  private static CommunitySetMatchExpr toCommunitySetMatchExpr(
+      ExpandedCommunityList ipCommunityListExpanded) {
+    return CommunitySetAcl.acl(
+        ipCommunityListExpanded.getLines().stream()
+            .map(RgosConversions::toCommunitySetAclLine)
+            .collect(ImmutableList.toImmutableList()));
+  }
+
+  private static CommunitySetMatchExpr toCommunitySetMatchExpr(
+      StandardCommunityList ipCommunityListStandard) {
+    return CommunitySetAcl.acl(
+        ipCommunityListStandard.getLines().stream()
+            .map(RgosConfiguration::toCommunitySetAclLine)
+            .collect(ImmutableList.toImmutableList()));
+  }
+
   public static final String DEFAULT_VRF_NAME = "default";
 
   public static final String MANAGEMENT_VRF_NAME = "management";
@@ -485,6 +606,9 @@ public final class RgosConfiguration extends VendorConfiguration {
   private static final int VLAN_NORMAL_MAX_RGOS = 4096;
 
   private static final int VLAN_NORMAL_MIN_RGOS = 2;
+  private final Map<String, StandardCommunityList> _standardCommunityLists;
+  private final Map<String, ExpandedCommunityList> _expandedCommunityLists;
+
 
   private final Map<String, Interface> _interfaces;
   private final RgosFamily _rf;
