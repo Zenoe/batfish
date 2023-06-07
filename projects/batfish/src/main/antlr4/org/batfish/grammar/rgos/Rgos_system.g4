@@ -1,4 +1,4 @@
-parser grammar Rgos_bgp;
+parser grammar RgosParser;
 
 import Rgos_common;
 

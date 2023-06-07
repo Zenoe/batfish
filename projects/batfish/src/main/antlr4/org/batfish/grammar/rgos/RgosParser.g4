@@ -64,4 +64,6 @@ stanza
    | s_interface
    | s_domain
    | s_version
+   | router_bgp_stanza
+
 ;

@@ -13,7 +13,7 @@ import javax.annotation.Nullable;
 
 public final class Vrf implements Serializable {
   // @Nonnull private final Map<Long, EigrpProcess> _eigrpProcesses;
-  // @Nullable private BgpProcess _bgpProcess;
+  @Nullable private BgpProcess _bgpProcess;
   // @Nullable private String _description;
   // @Nullable private IsisProcess _isisProcess;
   // @Nonnull private final String _name;
@@ -38,10 +38,10 @@ public final class Vrf implements Serializable {
     // _staticRoutes = new HashSet<>();
   }
 
-  // @Nullable
-  // public BgpProcess getBgpProcess() {
-  //   return _bgpProcess;
-  // }
+  @Nullable
+  public BgpProcess getBgpProcess() {
+    return _bgpProcess;
+  }
 
   // @Nullable
   // public String getDescription() {
@@ -121,9 +121,9 @@ public final class Vrf implements Serializable {
   //   return _staticRoutes;
   // }
 
-  // public void setBgpProcess(@Nullable BgpProcess bgpProcess) {
-  //   _bgpProcess = bgpProcess;
-  // }
+  public void setBgpProcess(@Nullable BgpProcess bgpProcess) {
+    _bgpProcess = bgpProcess;
+  }
 
   // public void setDescription(@Nullable String description) {
   //   _description = description;

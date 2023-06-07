@@ -26,6 +26,8 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import org.batfish.datamodel.IntegerSpace;
 import org.batfish.datamodel.SubRange;
+import org.batfish.datamodel.Configuration;
+
 import static org.batfish.representation.rgos.RgosStructureType.INTERFACE;
 import static org.batfish.representation.rgos.RgosStructureUsage.INTERFACE_SELF_REF;
 
@@ -48,10 +50,13 @@ import org.batfish.grammar.rgos.RgosParser.If_ip_addressContext;
 
 import org.batfish.representation.rgos.Interface;
 import org.batfish.representation.rgos.Vrf;
+import org.batfish.representation.rgos.BgpProcess;
 import org.batfish.grammar.rgos.RgosParser.RangeContext;
 import org.batfish.grammar.rgos.RgosParser.RangeContext;
 import org.batfish.grammar.rgos.RgosParser.SubrangeContext;
+import org.batfish.grammar.rgos.RgosParser.Router_bgp_stanzaContext;
 
+import org.batfish.grammar.rgos.RgosParser.Bgp_asnContext;
 
 // import org.batfish.grammar.rgos.RgosParser.Host_nameContext;
 // import org.batfish.grammar.rgos.RgosParser.Ipv4_addressContext;
@@ -204,6 +209,23 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
   }
 
   @Override
+  public void enterRouter_bgp_stanza(Router_bgp_stanzaContext ctx) {
+    long procNum = ctx.bgp_asn() == null ? 0 : toAsNum(ctx.bgp_asn());
+    Vrf vrf = _configuration.getVrfs().get(Configuration.DEFAULT_VRF_NAME);
+    if (vrf.getBgpProcess() == null) {
+      BgpProcess proc = new BgpProcess(procNum);
+      vrf.setBgpProcess(proc);
+    }
+    BgpProcess proc = vrf.getBgpProcess();
+    if (proc.getProcnum() != procNum && procNum != 0) {
+      warn(ctx, "Cannot have multiple BGP processes with different ASNs");
+      pushPeer(_dummyPeerGroup);
+      return;
+    }
+    pushPeer(proc.getMasterBgpPeerGroup());
+  }
+
+  @Override
   public void exitIf_ip_address(If_ip_addressContext ctx) {
     ConcreteInterfaceAddress address;
     if (ctx.prefix != null) {
@@ -310,6 +332,14 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
 
   private static Ip6 toIp6(Token t) {
     return Ip6.parse(t.getText());
+  }
+
+  private static long toAsNum(Bgp_asnContext ctx) {
+    if (ctx.asn != null) {
+      return toLong(ctx.asn);
+    }
+    String[] parts = ctx.asn4b.getText().split("\\.");
+    return (Long.parseLong(parts[0]) << 16) + Long.parseLong(parts[1]);
   }
 
   private static long toLong(DecContext ctx) {
