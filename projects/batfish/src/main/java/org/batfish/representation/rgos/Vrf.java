@@ -16,7 +16,7 @@ public final class Vrf implements Serializable {
   @Nullable private BgpProcess _bgpProcess;
   // @Nullable private String _description;
   // @Nullable private IsisProcess _isisProcess;
-  // @Nonnull private final String _name;
+  @Nonnull private final String _name;
   // @Nonnull private Map<String, OspfProcess> _ospfProcesses;
   // @Nullable private RipProcess _ripProcess;
   // @Nullable private RouteDistinguisher _routeDistinguisher;
@@ -32,7 +32,7 @@ public final class Vrf implements Serializable {
     _addressFamilies = new HashMap<>(4);
     _genericAddressFamily = new VrfAddressFamily();
     // _eigrpProcesses = new TreeMap<>();
-    // _name = name;
+    _name = name;
     // // Ensure that processes are in insertion order.
     // _ospfProcesses = new LinkedHashMap<>(0);
     // _staticRoutes = new HashSet<>();
@@ -80,10 +80,10 @@ public final class Vrf implements Serializable {
     return _genericAddressFamily;
   }
 
-  // @Nonnull
-  // public String getName() {
-  //   return _name;
-  // }
+  @Nonnull
+  public String getName() {
+    return _name;
+  }
 
   // /** Return OSPF processes defined on this VRF. Guaranteed to be in insertion order */
   // @Nonnull

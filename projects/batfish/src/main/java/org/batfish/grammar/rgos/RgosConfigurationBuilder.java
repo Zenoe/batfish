@@ -10,6 +10,8 @@ import static com.google.common.base.Preconditions.checkArgument;
 // import static java.util.Comparator.naturalOrder;
 
 import com.google.common.collect.Range;
+import com.google.common.collect.ImmutableSet;
+
 import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.annotation.Nonnull;
@@ -22,31 +24,69 @@ import org.batfish.common.Warnings.ParseWarning;
 import org.batfish.datamodel.ConcreteInterfaceAddress;
 import org.batfish.datamodel.Ip;
 import org.batfish.datamodel.Ip6;
+import org.batfish.datamodel.Prefix;
+import org.batfish.datamodel.Prefix6;
+
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import org.batfish.datamodel.IntegerSpace;
 import org.batfish.datamodel.SubRange;
 import org.batfish.datamodel.Configuration;
+import static org.batfish.datamodel.Names.bgpNeighborStructureName;
 
 import static org.batfish.representation.rgos.RgosStructureType.INTERFACE;
 import static org.batfish.representation.rgos.RgosStructureUsage.INTERFACE_SELF_REF;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_NEIGHBOR_SELF_REF;
+import static org.batfish.representation.rgos.RgosStructureType.BGP_NEIGHBOR;
+import static org.batfish.representation.rgos.RgosStructureType.BGP_UNDECLARED_PEER;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_NEIGHBOR_WITHOUT_REMOTE_AS;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_NEIGHBOR_WITHOUT_REMOTE_AS;
+import static org.batfish.representation.rgos.RgosStructureType.BGP_PEER_GROUP;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_PEER_GROUP_REFERENCED_BEFORE_DEFINED;
+import static org.batfish.representation.rgos.RgosStructureType.BGP_UNDECLARED_PEER_GROUP;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_NEIGHBOR_STATEMENT;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_UPDATE_SOURCE_INTERFACE;
+import static org.batfish.representation.rgos.RgosStructureType.ROUTE_MAP;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_NETWORK6_ORIGINATION_ROUTE_MAP;
+import static org.batfish.representation.rgos.RgosStructureUsage.BGP_NETWORK_ORIGINATION_ROUTE_MAP;
+
+
 
 // import org.batfish.datamodel.Ip;
 // import org.batfish.datamodel.Prefix;
 import org.batfish.grammar.BatfishCombinedParser;
 import org.batfish.grammar.SilentSyntaxListener;
 import org.batfish.grammar.UnrecognizedLineToken;
+import org.batfish.grammar.rgos.RgosParser.Neighbor_flat_rb_stanzaContext;
+import org.batfish.grammar.rgos.RgosParser.Address_family_rb_stanzaContext;
+import org.batfish.grammar.rgos.RgosParser.Router_id_bgp_tailContext;
+
+import org.batfish.grammar.rgos.RgosParser.Uint16Context;
+import org.batfish.grammar.rgos.RgosParser.Uint32Context;
+import org.batfish.grammar.rgos.RgosParser.Remote_as_bgp_tailContext;
+import org.batfish.grammar.rgos.RgosParser.Update_source_bgp_tailContext;
 
 import org.batfish.common.BatfishException;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.batfish.grammar.rgos.RgosParser.Activate_bgp_tailContext;
+import org.batfish.grammar.rgos.RgosParser.Network_bgp_tailContext;
+import org.batfish.grammar.rgos.RgosParser.Network6_bgp_tailContext;
+import org.batfish.grammar.rgos.RgosParser.Address_family_rb_stanzaContext;
 import org.batfish.grammar.rgos.RgosParser.S_interface_definitionContext;
 import org.batfish.grammar.rgos.RgosParser.S_hostnameContext;
 import org.batfish.grammar.rgos.RgosParser.Interface_nameContext;
 import org.batfish.grammar.rgos.RgosParser.If_ip_addressContext;
 
+import org.batfish.representation.rgos.BgpPeerGroup;
+import org.batfish.representation.rgos.MasterBgpPeerGroup;
+import org.batfish.representation.rgos.IpBgpPeerGroup;
+import org.batfish.representation.rgos.Ipv6BgpPeerGroup;
+import org.batfish.representation.rgos.NamedBgpPeerGroup;
+import org.batfish.representation.rgos.BgpNetwork;
+import org.batfish.representation.rgos.BgpNetwork6;
 
 import org.batfish.representation.rgos.Interface;
 import org.batfish.representation.rgos.Vrf;
@@ -79,11 +119,9 @@ import org.batfish.grammar.rgos.RgosParser.DecContext;
 import org.batfish.grammar.rgos.RgosParser.Vlan_idContext;
 import org.batfish.grammar.silent_syntax.SilentSyntaxCollection;
 import org.batfish.representation.rgos.RgosConfiguration;
-import org.batfish.representation.rgos.NextHop;
 // import org.batfish.vendor.rgos.NextHopDiscard;
 // import org.batfish.vendor.rgos.NextHopGateway;
 // import org.batfish.vendor.rgos.NextHopInterface;
-import org.batfish.representation.rgos.StaticRoute;
 
 @ParametersAreNonnullByDefault
 public final class RgosConfigurationBuilder extends RgosParserBaseListener
@@ -100,6 +138,8 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     _configuration.setExtraLines(_parser.getExtraLines());
     _w = warnings;
     _silentSyntax = silentSyntax;
+    _peerGroupStack = new ArrayList<>();
+
   }
 
   /**
@@ -130,6 +170,18 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     // Here for sanity, but should not trigger unless the definition of string rule is broken.
     checkArgument(text.charAt(text.length() - 1) == '"', "Improperly-quoted string: %s", text);
     return text.substring(1, text.length() - 1);
+  }
+
+  private void popPeer() {
+    int index = _peerGroupStack.size() - 1;
+    _currentPeerGroup = _peerGroupStack.get(index);
+    _peerGroupStack.remove(index);
+    _inIpv6BgpPeer = false;
+  }
+
+  private void pushPeer(@Nonnull BgpPeerGroup pg) {
+    _peerGroupStack.add(_currentPeerGroup);
+    _currentPeerGroup = pg;
   }
 
   @Override
@@ -225,6 +277,102 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     pushPeer(proc.getMasterBgpPeerGroup());
   }
 
+  public void enterNeighbor_flat_rb_stanza(Neighbor_flat_rb_stanzaContext ctx) {
+    if (ctx.ip6 != null) {
+      // Remember we are in IPv6 context so that structure references are identified accordingly
+      _inIpv6BgpPeer = true;
+    }
+    // do no further processing for unsupported address families / containers
+    if (_currentPeerGroup == _dummyPeerGroup) {
+      pushPeer(_dummyPeerGroup);
+      return;
+    }
+    BgpProcess proc = currentVrf().getBgpProcess();
+    // we must create peer group if it does not exist and this is a remote_as
+    // declaration
+    boolean create =
+        ctx.remote_as_bgp_tail() != null || ctx.inherit_peer_session_bgp_tail() != null;
+    if (ctx.ip != null) {
+      Ip ip = toIp(ctx.ip);
+      _currentIpPeerGroup = proc.getIpPeerGroups().get(ip);
+      String bgpNeighborStructName =
+          bgpNeighborStructureName(ip.toString(), currentVrf().getName());
+      if (_currentIpPeerGroup == null) {
+        if (create) {
+          _currentIpPeerGroup = proc.addIpPeerGroup(ip);
+          pushPeer(_currentIpPeerGroup);
+          _configuration.defineStructure(BGP_NEIGHBOR, bgpNeighborStructName, ctx);
+          _configuration.referenceStructure(
+              BGP_NEIGHBOR, bgpNeighborStructName, BGP_NEIGHBOR_SELF_REF, ctx.ip.getLine());
+        } else {
+          _configuration.referenceStructure(
+              BGP_UNDECLARED_PEER,
+              bgpNeighborStructName,
+              BGP_NEIGHBOR_WITHOUT_REMOTE_AS,
+              ctx.ip.getLine());
+          pushPeer(_dummyPeerGroup);
+        }
+      } else {
+        pushPeer(_currentIpPeerGroup);
+        _configuration.defineStructure(BGP_NEIGHBOR, bgpNeighborStructName, ctx);
+        _configuration.referenceStructure(
+            BGP_NEIGHBOR, bgpNeighborStructName, BGP_NEIGHBOR_SELF_REF, ctx.ip.getLine());
+      }
+    } else if (ctx.ip6 != null) {
+      Ip6 ip6 = toIp6(ctx.ip6);
+      Ipv6BgpPeerGroup pg6 = proc.getIpv6PeerGroups().get(ip6);
+      String bgpNeighborStructName =
+          bgpNeighborStructureName(ip6.toString(), currentVrf().getName());
+      if (pg6 == null) {
+        if (create) {
+          pg6 = proc.addIpv6PeerGroup(ip6);
+          pushPeer(pg6);
+          _configuration.defineStructure(BGP_NEIGHBOR, bgpNeighborStructName, ctx);
+          _configuration.referenceStructure(
+              BGP_NEIGHBOR, bgpNeighborStructName, BGP_NEIGHBOR_SELF_REF, ctx.ip6.getLine());
+        } else {
+          _configuration.referenceStructure(
+              BGP_UNDECLARED_PEER,
+              bgpNeighborStructName,
+              BGP_NEIGHBOR_WITHOUT_REMOTE_AS,
+              ctx.ip6.getLine());
+          pushPeer(_dummyPeerGroup);
+        }
+      } else {
+        pushPeer(pg6);
+        _configuration.defineStructure(BGP_NEIGHBOR, bgpNeighborStructName, ctx);
+        _configuration.referenceStructure(
+            BGP_NEIGHBOR, bgpNeighborStructName, BGP_NEIGHBOR_SELF_REF, ctx.ip6.getLine());
+      }
+      _currentIpv6PeerGroup = pg6;
+    } else if (ctx.peergroup != null) {
+      String name = ctx.peergroup.getText();
+      _currentNamedPeerGroup = proc.getNamedPeerGroups().get(name);
+      if (_currentNamedPeerGroup == null) {
+        if (create) {
+          _currentNamedPeerGroup = proc.addNamedPeerGroup(name);
+          _configuration.referenceStructure(
+              BGP_PEER_GROUP, name, BGP_NEIGHBOR_STATEMENT, ctx.peergroup.getLine());
+        } else {
+          _configuration.referenceStructure(
+              BGP_UNDECLARED_PEER_GROUP,
+              name,
+              BGP_PEER_GROUP_REFERENCED_BEFORE_DEFINED,
+              ctx.peergroup.getLine());
+          _currentNamedPeerGroup = new NamedBgpPeerGroup("dummy");
+        }
+      }
+      pushPeer(_currentNamedPeerGroup);
+    } else {
+      throw new BatfishException("unknown neighbor type");
+    }
+  }
+
+  @Override
+  public void exitRouter_bgp_stanza(Router_bgp_stanzaContext ctx) {
+    popPeer();
+  }
+
   @Override
   public void exitIf_ip_address(If_ip_addressContext ctx) {
     ConcreteInterfaceAddress address;
@@ -254,6 +402,99 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     }
   }
 
+  @Override
+  public void exitAddress_family_rb_stanza(Address_family_rb_stanzaContext ctx) {
+    if (ctx.address_family_header() != null
+        && ctx.address_family_header().af != null
+        && ctx.address_family_header().af.vrf_name != null) {
+      _currentVrf = Configuration.DEFAULT_VRF_NAME;
+    }
+    popPeer();
+  }
+
+  @Override
+  public void exitRouter_id_bgp_tail(Router_id_bgp_tailContext ctx) {
+    Ip routerId = toIp(ctx.routerid);
+    BgpProcess proc = currentVrf().getBgpProcess();
+    proc.setRouterId(routerId);
+  }
+
+  @Override
+  public void exitRemote_as_bgp_tail(Remote_as_bgp_tailContext ctx) {
+    BgpProcess proc = currentVrf().getBgpProcess();
+    if (_currentPeerGroup == proc.getMasterBgpPeerGroup()) {
+      throw new BatfishException(
+          "no peer or peer group in context: " + getLocation(ctx) + getFullText(ctx));
+    }
+    long as = toAsNum(ctx.remote);
+    _currentPeerGroup.setRemoteAs(as);
+    if (ctx.alt_ases != null) {
+      _currentPeerGroup.setAlternateAs(
+          ctx.alt_ases.stream()
+              .map(RgosConfigurationBuilder::toAsNum)
+              .collect(ImmutableSet.toImmutableSet()));
+    }
+  }
+
+  @Override
+  public void exitUpdate_source_bgp_tail(Update_source_bgp_tailContext ctx) {
+    String source = toInterfaceName(ctx.source);
+    _configuration.referenceStructure(
+        INTERFACE, source, BGP_UPDATE_SOURCE_INTERFACE, ctx.getStart().getLine());
+
+    if (_currentPeerGroup != null) {
+      _currentPeerGroup.setUpdateSource(source);
+    }
+  }
+
+  @Override
+  public void exitNetwork_bgp_tail(Network_bgp_tailContext ctx) {
+    Prefix prefix;
+    if (ctx.prefix != null) {
+      prefix = Prefix.parse(ctx.prefix.getText());
+    } else {
+      Ip address = toIp(ctx.ip);
+      Ip mask = (ctx.mask != null) ? toIp(ctx.mask) : address.getClassMask();
+      int prefixLength = mask.numSubnetBits();
+      prefix = Prefix.create(address, prefixLength);
+    }
+    String map = null;
+    if (ctx.mapname != null) {
+      map = ctx.mapname.getText();
+      _configuration.referenceStructure(
+          ROUTE_MAP, map, BGP_NETWORK_ORIGINATION_ROUTE_MAP, ctx.mapname.getStart().getLine());
+    }
+    BgpNetwork bgpNetwork = new BgpNetwork(map);
+    BgpProcess proc = currentVrf().getBgpProcess();
+    proc.getIpNetworks().put(prefix, bgpNetwork);
+  }
+
+  @Override
+  public void exitNetwork6_bgp_tail(Network6_bgp_tailContext ctx) {
+    Prefix6 prefix6 = Prefix6.parse(ctx.prefix.getText());
+    String map = null;
+    if (ctx.mapname != null) {
+      map = ctx.mapname.getText();
+      _configuration.referenceStructure(
+          ROUTE_MAP, map, BGP_NETWORK6_ORIGINATION_ROUTE_MAP, ctx.mapname.getStart().getLine());
+    }
+    BgpProcess proc = currentVrf().getBgpProcess();
+    BgpNetwork6 bgpNetwork6 = new BgpNetwork6(map);
+    proc.getIpv6Networks().put(prefix6, bgpNetwork6);
+  }
+
+  @Override
+  public void exitActivate_bgp_tail(Activate_bgp_tailContext ctx) {
+    if (_currentPeerGroup == null) {
+      return;
+    }
+    BgpProcess proc = currentVrf().getBgpProcess();
+    if (_currentPeerGroup != proc.getMasterBgpPeerGroup()) {
+      _currentPeerGroup.setActive(true);
+    } else {
+      throw new BatfishException("no peer or peer group to activate in this context");
+    }
+  }
 
   @Override
   public void exitEveryRule(ParserRuleContext ctx) {
@@ -282,6 +523,14 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
 
   public @Nonnull RgosConfiguration getConfiguration() {
     return _configuration;
+  }
+
+  private String getLocation(ParserRuleContext ctx) {
+    return ctx.getStart().getLine() + ":" + ctx.getStart().getCharPositionInLine() + ": ";
+  }
+
+  private Vrf currentVrf() {
+    return initVrf(_currentVrf);
   }
 
   private Interface addInterface(String name, Interface_nameContext ctx, boolean explicit) {
@@ -341,6 +590,14 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
     String[] parts = ctx.asn4b.getText().split("\\.");
     return (Long.parseLong(parts[0]) << 16) + Long.parseLong(parts[1]);
   }
+  private static long toLong(Uint16Context ctx) {
+    return Long.parseLong(ctx.getText());
+  }
+
+  private static long toLong(Uint32Context ctx) {
+    return Long.parseLong(ctx.getText());
+  }
+
 
   private static long toLong(DecContext ctx) {
     return Long.parseLong(ctx.getText());
@@ -379,6 +636,20 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
   private static int toInteger(Vlan_idContext ctx) {
     return Integer.parseInt(ctx.getText(), 10);
   }
+  private static String toInterfaceName(Interface_nameContext ctx) {
+    StringBuilder name =
+        new StringBuilder(
+            RgosConfiguration.getCanonicalInterfaceNamePrefix(ctx.name_prefix_alpha.getText()));
+    for (Token part : ctx.name_middle_parts) {
+      name.append(part.getText());
+    }
+    if (ctx.range().range_list.size() != 1) {
+      throw new BatfishException(
+          "got interface range where single interface was expected: '" + ctx.getText() + "'");
+    }
+    name.append(ctx.range().getText());
+    return name.toString();
+  }
 
 
   private final @Nonnull RgosCombinedParser _parser;
@@ -386,9 +657,18 @@ public final class RgosConfigurationBuilder extends RgosParserBaseListener
   private final @Nonnull RgosConfiguration _configuration;
   private final @Nonnull Warnings _w;
   private final @Nonnull SilentSyntaxCollection _silentSyntax;
+  private final @Nonnull BgpPeerGroup _dummyPeerGroup = new MasterBgpPeerGroup();
 
-  private StaticRoute _currentStaticRoute;
-  private NextHop _currentNextHop;
+  private Ipv6BgpPeerGroup _currentIpv6PeerGroup;
+  private NamedBgpPeerGroup _currentNamedPeerGroup;
+
+  private BgpPeerGroup _currentPeerGroup;
+  private boolean _inIpv6BgpPeer;
+  private final List<BgpPeerGroup> _peerGroupStack;
+  private String _currentVrf;
+  private IpBgpPeerGroup _currentIpPeerGroup;
+
+
   private List<Interface> _currentInterfaces;
 
   private static final IntegerSpace HOSTNAME_LENGTH_RANGE = IntegerSpace.of(Range.closed(1, 32));
