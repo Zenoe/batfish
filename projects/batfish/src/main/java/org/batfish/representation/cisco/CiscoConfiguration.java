@@ -1683,6 +1683,7 @@ public final class CiscoConfiguration extends VendorConfiguration {
 
   // For testing.
   If convertOspfRedistributionPolicy(OspfRedistributionPolicy policy, OspfProcess proc) {
+
     RoutingProtocol protocol = policy.getInstance().getProtocol();
     // All redistribution must match the specified protocol.
     Conjunction ospfExportConditions = new Conjunction();

@@ -2,10 +2,10 @@ package org.batfish.representation.rgos;
 
 import java.io.Serializable;
 import java.util.HashMap;
-// import java.util.HashSet;
-// import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
-// import java.util.Set;
+import java.util.Set;
 // import java.util.TreeMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -14,15 +14,15 @@ import javax.annotation.Nullable;
 public final class Vrf implements Serializable {
   // @Nonnull private final Map<Long, EigrpProcess> _eigrpProcesses;
   @Nullable private BgpProcess _bgpProcess;
-  // @Nullable private String _description;
+  @Nullable private String _description;
   // @Nullable private IsisProcess _isisProcess;
   @Nonnull private final String _name;
-  // @Nonnull private Map<String, OspfProcess> _ospfProcesses;
+  @Nonnull private Map<String, OspfProcess> _ospfProcesses;
   // @Nullable private RipProcess _ripProcess;
   // @Nullable private RouteDistinguisher _routeDistinguisher;
 
   // private boolean _shutdown;
-  // @Nonnull private final Set<StaticRoute> _staticRoutes;
+  @Nonnull private final Set<StaticRoute> _staticRoutes;
   // @Nullable private Integer _vni;
 
   @Nonnull private final Map<AddressFamilyType, VrfAddressFamily> _addressFamilies;
@@ -34,8 +34,8 @@ public final class Vrf implements Serializable {
     // _eigrpProcesses = new TreeMap<>();
     _name = name;
     // // Ensure that processes are in insertion order.
-    // _ospfProcesses = new LinkedHashMap<>(0);
-    // _staticRoutes = new HashSet<>();
+    _ospfProcesses = new LinkedHashMap<>(0);
+    _staticRoutes = new HashSet<>();
   }
 
   @Nullable
@@ -43,10 +43,10 @@ public final class Vrf implements Serializable {
     return _bgpProcess;
   }
 
-  // @Nullable
-  // public String getDescription() {
-  //   return _description;
-  // }
+  @Nullable
+  public String getDescription() {
+    return _description;
+  }
 
   // @Nonnull
   // public Map<Long, EigrpProcess> getEigrpProcesses() {
@@ -85,11 +85,11 @@ public final class Vrf implements Serializable {
     return _name;
   }
 
-  // /** Return OSPF processes defined on this VRF. Guaranteed to be in insertion order */
-  // @Nonnull
-  // public Map<String, OspfProcess> getOspfProcesses() {
-  //   return _ospfProcesses;
-  // }
+  /** Return OSPF processes defined on this VRF. Guaranteed to be in insertion order */
+  @Nonnull
+  public Map<String, OspfProcess> getOspfProcesses() {
+    return _ospfProcesses;
+  }
 
   // @Nullable
   // public RipProcess getRipProcess() {
@@ -116,18 +116,18 @@ public final class Vrf implements Serializable {
   //   return _vni;
   // }
 
-  // @Nonnull
-  // public Set<StaticRoute> getStaticRoutes() {
-  //   return _staticRoutes;
-  // }
+  @Nonnull
+  public Set<StaticRoute> getStaticRoutes() {
+    return _staticRoutes;
+  }
 
   public void setBgpProcess(@Nullable BgpProcess bgpProcess) {
     _bgpProcess = bgpProcess;
   }
 
-  // public void setDescription(@Nullable String description) {
-  //   _description = description;
-  // }
+  public void setDescription(@Nullable String description) {
+    _description = description;
+  }
 
   // public void setIsisProcess(@Nullable IsisProcess isisProcess) {
   //   _isisProcess = isisProcess;

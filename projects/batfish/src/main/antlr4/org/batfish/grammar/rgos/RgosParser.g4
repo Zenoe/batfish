@@ -3,6 +3,7 @@ parser grammar RgosParser;
 import
 Rgos_system,
 Rgos_bgp,
+Rgos_ospf,
 Rgos_interface,
 Rgos_common;
 
@@ -65,5 +66,6 @@ stanza
    | s_domain
    | s_version
    | router_bgp_stanza
+   | s_router_ospf
 
 ;
